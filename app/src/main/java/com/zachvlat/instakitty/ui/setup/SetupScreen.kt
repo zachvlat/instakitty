@@ -148,11 +148,10 @@ fun SetupScreen(
 
             Spacer(Modifier.height(32.dp))
             Text(
-                text = "Public instances: kittygr.am, kg.meowing.de\nSelf-host your own for full control.",
+                text = "Enter any Kittygram instance URL to get started.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp
+                textAlign = TextAlign.Center
             )
         }
     }

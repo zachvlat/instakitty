@@ -3,6 +3,8 @@ package com.zachvlat.instakitty.ui.components
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -80,14 +82,34 @@ fun PostCard(
             val mediaUrl = post.imageUrl ?: post.images?.firstOrNull()?.imageUrl
                 ?: post.videoThumbnail
             if (mediaUrl != null) {
-                AsyncImage(
-                    model = mediaUrl,
-                    contentDescription = post.altText ?: "Post image",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 400.dp),
-                    contentScale = ContentScale.Crop
-                )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    AsyncImage(
+                        model = mediaUrl,
+                        contentDescription = post.altText ?: "Post image",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 400.dp),
+                        contentScale = ContentScale.Crop
+                    )
+                    if (post.videoUrl != null) {
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(48.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.PlayArrow,
+                                    contentDescription = "Play video",
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             Column(modifier = Modifier.padding(12.dp)) {

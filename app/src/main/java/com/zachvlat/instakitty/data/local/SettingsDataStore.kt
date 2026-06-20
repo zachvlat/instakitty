@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -19,6 +20,7 @@ class SettingsDataStore(private val context: Context) {
         private val INSTANCE_URL = stringPreferencesKey("instance_url")
         private val API_TOKEN = stringPreferencesKey("api_token")
         private val FOLLOWED_USERS = stringPreferencesKey("followed_users")
+        private val PROFILE_PICS = stringPreferencesKey("profile_pics")
     }
 
     val instanceUrl: Flow<String> = context.dataStore.data.map { prefs ->
@@ -42,6 +44,17 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    val profilePics: Flow<Map<String, String>> = context.dataStore.data.map { prefs ->
+        val raw = prefs[PROFILE_PICS] ?: return@map emptyMap()
+        try {
+            Json.decodeFromString<Map<String, String>>(raw)
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    suspend fun getProfilePicsSnapshot(): Map<String, String> = profilePics.first()
+
     suspend fun saveInstance(url: String, token: String = "") {
         context.dataStore.edit { prefs ->
             prefs[INSTANCE_URL] = url.trimEnd('/')
@@ -57,7 +70,20 @@ class SettingsDataStore(private val context: Context) {
             } catch (_: Exception) {
                 mutableSetOf()
             }
-            if (username in current) current.remove(username) else current.add(username)
+            if (username in current) {
+                current.remove(username)
+                // clean up cached profile pic
+                val picsRaw = prefs[PROFILE_PICS] ?: "{}"
+                val pics = try {
+                    Json.decodeFromString<MutableMap<String, String>>(picsRaw)
+                } catch (_: Exception) {
+                    mutableMapOf()
+                }
+                pics.remove(username)
+                prefs[PROFILE_PICS] = Json.encodeToString(pics)
+            } else {
+                current.add(username)
+            }
             prefs[FOLLOWED_USERS] = Json.encodeToString(current)
         }
     }
@@ -72,6 +98,25 @@ class SettingsDataStore(private val context: Context) {
             }
             current.addAll(usernames)
             prefs[FOLLOWED_USERS] = Json.encodeToString(current)
+        }
+    }
+
+    suspend fun saveProfilePics(pics: Map<String, String>) {
+        context.dataStore.edit { prefs ->
+            prefs[PROFILE_PICS] = Json.encodeToString(pics)
+        }
+    }
+
+    suspend fun updateProfilePic(username: String, url: String) {
+        context.dataStore.edit { prefs ->
+            val raw = prefs[PROFILE_PICS] ?: "{}"
+            val current = try {
+                Json.decodeFromString<MutableMap<String, String>>(raw)
+            } catch (_: Exception) {
+                mutableMapOf()
+            }
+            current[username] = url
+            prefs[PROFILE_PICS] = Json.encodeToString(current)
         }
     }
 
