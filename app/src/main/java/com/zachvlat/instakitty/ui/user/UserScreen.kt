@@ -1,10 +1,15 @@
 package com.zachvlat.instakitty.ui.user
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -12,10 +17,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.zachvlat.instakitty.ui.components.PostCard
+import com.zachvlat.instakitty.data.remote.Post
 
 @Composable
 fun UserScreen(
@@ -29,11 +36,11 @@ fun UserScreen(
     }
 
     val state by viewModel.state.collectAsState()
-    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
 
-    LaunchedEffect(listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index) {
-        val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@LaunchedEffect
-        if (lastVisible >= state.posts.size - 3 && state.endCursor != null && !state.isLoadingMore) {
+    LaunchedEffect(gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index) {
+        val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@LaunchedEffect
+        if (lastVisible >= state.posts.size - 6 && state.endCursor != null && !state.isLoadingMore) {
             viewModel.loadMore()
         }
     }
@@ -76,12 +83,14 @@ fun UserScreen(
                     }
                 }
                 else -> {
-                    LazyColumn(
-                        state = listState,
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        state = gridState,
+                        contentPadding = PaddingValues(0.dp),
+                        horizontalArrangement = Arrangement.spacedBy(1.dp),
+                        verticalArrangement = Arrangement.spacedBy(1.dp)
                     ) {
-                        item {
+                        item(span = { GridItemSpan(3) }) {
                             state.user?.let { user ->
                                 UserHeader(
                                     user = user,
@@ -90,15 +99,19 @@ fun UserScreen(
                                 )
                             }
                         }
+                        item(span = { GridItemSpan(3) }) {
+                            if (state.posts.isNotEmpty()) {
+                                HorizontalDivider()
+                            }
+                        }
                         items(state.posts, key = { it.shortcode ?: it.id ?: "" }) { post ->
-                            PostCard(
+                            ProfilePostThumbnail(
                                 post = post,
-                                onPostClick = onPostClick,
-                                onUserClick = {}
+                                onClick = { post.shortcode?.let(onPostClick) }
                             )
                         }
                         if (state.isLoadingMore) {
-                            item {
+                            item(span = { GridItemSpan(3) }) {
                                 Box(
                                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                                     contentAlignment = Alignment.Center
@@ -121,56 +134,50 @@ private fun UserHeader(
     onToggleFollow: () -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        val pp = user.profilePicture ?: user.profilePicUrl
-        if (pp != null) {
-            AsyncImage(
-                model = pp,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(96.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val pp = user.profilePicture ?: user.profilePicUrl
+            if (pp != null) {
+                AsyncImage(
+                    model = pp,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            Spacer(Modifier.width(24.dp))
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                StatItem("Posts", user.mediaCount ?: 0)
+                StatItem("Followers", user.followerCount ?: 0)
+                StatItem("Following", user.followingCount ?: 0)
+            }
         }
-        Spacer(Modifier.height(12.dp))
+
+        Spacer(Modifier.height(8.dp))
         Text(
             text = user.displayName ?: user.username ?: "",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp
         )
         if (user.username != null) {
             Text(
-                text = "@${user.username}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = user.biography ?: "",
+                fontSize = 14.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
             )
         }
-        Spacer(Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            StatItem("Posts", user.mediaCount ?: 0)
-            Spacer(Modifier.width(32.dp))
-            StatItem("Followers", user.followerCount ?: 0)
-            Spacer(Modifier.width(32.dp))
-            StatItem("Following", user.followingCount ?: 0)
-        }
-        Spacer(Modifier.height(12.dp))
-        if (!user.biography.isNullOrBlank()) {
-            Text(
-                text = user.biography,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 32.dp)
-            )
-            Spacer(Modifier.height(12.dp))
-        }
+
+        Spacer(Modifier.height(8.dp))
         Button(
             onClick = onToggleFollow,
+            modifier = Modifier.fillMaxWidth(),
             colors = if (isFollowing) {
                 ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -182,9 +189,8 @@ private fun UserHeader(
         ) {
             Text(if (isFollowing) "Following" else "Follow")
         }
-        Spacer(Modifier.height(8.dp))
-        HorizontalDivider()
-        Spacer(Modifier.height(8.dp))
+
+        Spacer(Modifier.height(4.dp))
     }
 }
 
@@ -194,13 +200,65 @@ private fun StatItem(label: String, count: Int) {
         Text(
             text = formatUserCount(count),
             fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleMedium
+            fontSize = 16.sp
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
+            fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Composable
+private fun ProfilePostThumbnail(
+    post: Post,
+    onClick: () -> Unit
+) {
+    val mediaUrl = post.imageUrl ?: post.images?.firstOrNull()?.imageUrl
+        ?: post.videoThumbnail
+
+    Box(
+        modifier = Modifier
+            .aspectRatio(1f)
+            .clickable(onClick = onClick)
+    ) {
+        if (mediaUrl != null) {
+            AsyncImage(
+                model = mediaUrl,
+                contentDescription = post.altText ?: "Post thumbnail",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text("?", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        if (post.videoUrl != null) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .size(24.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = "Video",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
     }
 }
 

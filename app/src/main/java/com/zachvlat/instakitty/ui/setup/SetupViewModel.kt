@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 data class SetupUiState(
@@ -17,8 +16,7 @@ data class SetupUiState(
     val apiToken: String = "",
     val status: String = "",
     val isTesting: Boolean = false,
-    val isConfigured: Boolean = false,
-    val showTokenField: Boolean = false
+    val isConfigured: Boolean = false
 )
 
 class SetupViewModel(application: Application) : AndroidViewModel(application) {
@@ -71,8 +69,7 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 _state.value = _state.value.copy(
                     isTesting = false,
-                    status = result.message,
-                    showTokenField = result.message.contains("401")
+                    status = result.message
                 )
             }
         }

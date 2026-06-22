@@ -79,34 +79,32 @@ fun SetupScreen(
                         )
                     )
 
-                    AnimatedVisibility(visible = state.showTokenField) {
-                        Column {
-                            Spacer(Modifier.height(16.dp))
-                            Text(
-                                text = "API Token (optional)",
-                                style = MaterialTheme.typography.labelLarge
+                    Column {
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            text = "API Token (optional)",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "Required if your instance needs authentication",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = state.apiToken,
+                            onValueChange = viewModel::onTokenChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("Bearer token") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = { focusManager.clearFocus() }
                             )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "This instance requires authentication",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = state.apiToken,
-                                onValueChange = viewModel::onTokenChange,
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("Bearer token") },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(
-                                    imeAction = ImeAction.Done
-                                ),
-                                keyboardActions = KeyboardActions(
-                                    onDone = { focusManager.clearFocus() }
-                                )
-                            )
-                        }
+                        )
                     }
 
                     Spacer(Modifier.height(8.dp))
@@ -157,7 +155,3 @@ fun SetupScreen(
     }
 }
 
-@Composable
-private fun AnimatedVisibility(visible: Boolean, content: @Composable () -> Unit) {
-    if (visible) content()
-}

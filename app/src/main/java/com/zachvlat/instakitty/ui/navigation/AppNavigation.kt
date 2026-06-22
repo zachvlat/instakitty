@@ -49,7 +49,7 @@ fun AppNavigation(dataStore: SettingsDataStore) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val showBottomBar = currentRoute in listOf("home", "following", "settings")
+    val showBottomBar = currentRoute != null && currentRoute != "setup"
 
     Scaffold(
         bottomBar = {

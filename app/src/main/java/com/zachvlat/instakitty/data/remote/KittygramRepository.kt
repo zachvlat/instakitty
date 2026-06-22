@@ -25,23 +25,32 @@ class KittygramRepository(private val dataStore: SettingsDataStore) {
         return try {
             val client = RetrofitClient.create(url, token.ifBlank { null })
             val status = client.getStatus()
-            if (status.isSuccessful) {
-                val s = status.body()
-                if (s?.redis == true) {
-                    ConnectionResult(true, "Connected!")
-                } else {
-                    ConnectionResult(true, "Connected (no cache)")
-                }
-            } else {
+            if (!status.isSuccessful) {
                 val code = status.code()
                 val msg = when (code) {
-                    401 -> "Instance requires an API token (401)"
                     503 -> "Instance is rate-limited (503)"
                     404 -> "Instance not found (404)"
                     418 -> "Instance blocked this request (418)"
                     else -> "HTTP $code"
                 }
-                ConnectionResult(false, msg)
+                return ConnectionResult(false, msg)
+            }
+
+            val info = client.getInfo()
+            if (!info.isSuccessful && info.code() == 401) {
+                return ConnectionResult(
+                    false, if (token.isBlank())
+                        "Instance requires an API token (401)"
+                    else
+                        "API token is invalid (401)"
+                )
+            }
+
+            val s = status.body()
+            if (s?.redis == true) {
+                ConnectionResult(true, "Connected!")
+            } else {
+                ConnectionResult(true, "Connected (no cache)")
             }
         } catch (e: Exception) {
             ConnectionResult(false, e.message ?: "Connection failed")
