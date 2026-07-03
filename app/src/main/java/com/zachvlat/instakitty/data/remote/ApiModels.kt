@@ -1,7 +1,14 @@
 package com.zachvlat.instakitty.data.remote
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
 
 // ─── Errors ─────────────────────────────────────────────────
 
@@ -82,6 +89,45 @@ data class Post(
     @SerialName("has_errors") val hasErrors: Boolean? = null,
     @SerialName("error_type") val errorType: String? = null,
     @SerialName("error_info") val errorInfo: ErrorInfo? = null
+)
+
+// ─── Search Response ────────────────────────────────────────
+
+object EmptyObjectAsSearchUserListSerializer : KSerializer<List<SearchUser>> {
+    private val delegate = ListSerializer(SearchUser.serializer())
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun deserialize(decoder: Decoder): List<SearchUser> {
+        val input = decoder as JsonDecoder
+        val element = input.decodeJsonElement()
+        return if (element is JsonArray) {
+            input.json.decodeFromJsonElement(delegate, element)
+        } else {
+            emptyList()
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: List<SearchUser>) {
+        encoder.encodeSerializableValue(delegate, value)
+    }
+}
+
+@Serializable
+data class SearchResponse(
+    @SerialName("search_source") val searchSource: String? = null,
+    @Serializable(with = EmptyObjectAsSearchUserListSerializer::class)
+    val users: List<SearchUser> = emptyList(),
+    @SerialName("has_errors") val hasErrors: Boolean? = null,
+    @SerialName("error_type") val errorType: String? = null,
+    @SerialName("error_info") val errorInfo: ErrorInfo? = null
+)
+
+@Serializable
+data class SearchUser(
+    val username: String? = null,
+    @SerialName("profile_picture") val profilePicture: String? = null,
+    val id: String? = null,
+    @SerialName("is_verified") val isVerified: Boolean? = null
 )
 
 // ─── User Profile Response ──────────────────────────────────

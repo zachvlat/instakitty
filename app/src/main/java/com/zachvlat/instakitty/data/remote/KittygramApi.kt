@@ -21,4 +21,7 @@ interface KittygramApi {
         @Path("username") username: String,
         @Query("cursor") cursor: String? = null
     ): Response<UserProfileResponse>
+
+    @GET("api/search")
+    suspend fun search(@Query("query") query: String): Response<SearchResponse>
 }

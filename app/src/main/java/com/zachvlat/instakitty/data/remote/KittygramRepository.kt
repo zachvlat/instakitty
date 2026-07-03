@@ -21,6 +21,41 @@ class KittygramRepository(private val dataStore: SettingsDataStore) {
         return cachedClient
     }
 
+    suspend fun searchUsers(query: String): ApiResult<List<User>> {
+        val client = getClient() ?: return ApiResult.NetworkError("No instance configured")
+        return try {
+            val res = client.search(query)
+            if (res.isSuccessful) {
+                val body = res.body()
+                if (body != null) {
+                    if (body.hasErrors == true) {
+                        ApiResult.Error(
+                            body.errorType ?: "unknown",
+                            body.errorInfo?.message ?: "Unknown error"
+                        )
+                    } else {
+                        val users = body.users.map { su ->
+                            User(
+                                username = su.username,
+                                profilePicture = su.profilePicture,
+                                profilePicUrl = su.profilePicture,
+                                isVerified = su.isVerified,
+                                id = su.id
+                            )
+                        }.take(5)
+                        ApiResult.Success(users)
+                    }
+                } else {
+                    ApiResult.NetworkError("Empty response")
+                }
+            } else {
+                ApiResult.Error("http_${res.code()}", res.message())
+            }
+        } catch (e: Exception) {
+            ApiResult.NetworkError(e.message ?: "Search failed")
+        }
+    }
+
     suspend fun testConnection(url: String, token: String = ""): ConnectionResult {
         return try {
             val client = RetrofitClient.create(url, token.ifBlank { null })
