@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.zachvlat.instakitty.data.local.SettingsDataStore
 import com.zachvlat.instakitty.data.remote.ApiResult
 import com.zachvlat.instakitty.data.remote.KittygramRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,38 +28,69 @@ class FollowingViewModel(application: Application) : AndroidViewModel(applicatio
     private val _state = MutableStateFlow(FollowingUiState())
     val state: StateFlow<FollowingUiState> = _state.asStateFlow()
 
+    private val _removingUsers = MutableStateFlow<Set<String>>(emptySet())
+    val removingUsers: StateFlow<Set<String>> = _removingUsers.asStateFlow()
+
     init {
         viewModelScope.launch {
             dataStore.followedUsers.collect { users ->
                 val sorted = users.toList().sorted()
                 val cachedPics = dataStore.getProfilePicsSnapshot()
+                _removingUsers.value = _removingUsers.value.intersect(sorted.toSet())
                 _state.value = _state.value.copy(
                     usernames = sorted,
                     profilePics = sorted.mapNotNull { cachedPics[it]?.let { url -> it to url } }.toMap(),
                     isLoading = false
                 )
-                sorted.forEach { loadProfilePic(it) }
+                sorted.forEach { user ->
+                    if (cachedPics[user] == null) {
+                        loadProfilePic(user)
+                    }
+                    delay(500L)
+                }
             }
         }
     }
 
     private suspend fun loadProfilePic(username: String) {
-        val result = repository.getUser(username)
-        if (result is ApiResult.Success) {
-            val url = result.data.userInfo?.profilePicture
-                ?: result.data.userInfo?.profilePicUrl
-            if (url != null) {
-                _state.value = _state.value.copy(
-                    profilePics = _state.value.profilePics + (username to url)
-                )
-                dataStore.updateProfilePic(username, url)
+        var attempts = 0
+        while (attempts < 3) {
+            val result = repository.getUser(username)
+            when {
+                result is ApiResult.Success -> {
+                    val url = result.data.userInfo?.profilePicture
+                        ?: result.data.userInfo?.profilePicUrl
+                    if (url != null) {
+                        _state.value = _state.value.copy(
+                            profilePics = _state.value.profilePics + (username to url)
+                        )
+                        dataStore.updateProfilePic(username, url)
+                    }
+                    return
+                }
+                result is ApiResult.Error && isRateLimitError(result) -> {
+                    attempts++
+                    if (attempts < 3) {
+                        delay(1000L * (1 shl (attempts - 1)))
+                    }
+                }
+                else -> return
             }
         }
     }
 
+    private fun isRateLimitError(error: ApiResult.Error): Boolean {
+        return error.type == "ratelimited" || error.type == "http_502"
+    }
+
     fun removeUser(username: String) {
+        _removingUsers.value = _removingUsers.value + username
         viewModelScope.launch {
-            dataStore.toggleFollow(username)
+            try {
+                dataStore.toggleFollow(username)
+            } catch (_: Exception) {
+                _removingUsers.value = _removingUsers.value - username
+            }
         }
     }
 

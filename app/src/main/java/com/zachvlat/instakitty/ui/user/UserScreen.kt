@@ -104,7 +104,9 @@ fun UserScreen(
                                 HorizontalDivider()
                             }
                         }
-                        items(state.posts, key = { it.shortcode ?: it.id ?: "" }) { post ->
+                        val posts = state.posts
+                        items(posts.size, key = { index -> "${posts[index].shortcode ?: posts[index].id ?: "post"}_$index" }) { index ->
+                            val post = posts[index]
                             ProfilePostThumbnail(
                                 post = post,
                                 onClick = { post.shortcode?.let(onPostClick) }
