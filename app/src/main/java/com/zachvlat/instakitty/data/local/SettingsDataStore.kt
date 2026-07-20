@@ -72,7 +72,6 @@ class SettingsDataStore(private val context: Context) {
             }
             if (username in current) {
                 current.remove(username)
-                // clean up cached profile pic
                 val picsRaw = prefs[PROFILE_PICS] ?: "{}"
                 val pics = try {
                     Json.decodeFromString<MutableMap<String, String>>(picsRaw)

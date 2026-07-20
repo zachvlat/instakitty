@@ -50,7 +50,6 @@ fun UserScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onBack) { Text("←") }
             Spacer(Modifier.weight(1f))
             Text(
                 text = state.user?.username ?: username,
@@ -58,7 +57,6 @@ fun UserScreen(
                 fontWeight = FontWeight.Bold
             )
             Spacer(Modifier.weight(1f))
-            Spacer(Modifier.width(64.dp))
         }
 
         Box(modifier = Modifier.fillMaxSize()) {

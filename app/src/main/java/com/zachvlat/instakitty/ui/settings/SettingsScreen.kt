@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -24,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val state by viewModel.state.collectAsState()
     var showDialog by remember { mutableStateOf(false) }
     var dialogUrl by remember { mutableStateOf("") }
@@ -85,6 +87,42 @@ fun SettingsScreen(
         Card(
             modifier = Modifier.fillMaxWidth()
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Deep Links",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Open Instagram links directly in InstaKitty",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                TextButton(onClick = {
+                    val intent = android.content.Intent(
+                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        android.net.Uri.fromParts("package", context.packageName, null)
+                    )
+                    context.startActivity(intent)
+                }) {
+                    Text("Set Up")
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "About",
@@ -93,7 +131,7 @@ fun SettingsScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "InstaKitty v1.1",
+                    text = "InstaKitty v1.5.0",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

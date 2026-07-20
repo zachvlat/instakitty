@@ -10,8 +10,6 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 
-// ─── Errors ─────────────────────────────────────────────────
-
 @Serializable
 data class ApiError(
     @SerialName("has_errors") val hasErrors: Boolean = false,
@@ -24,8 +22,6 @@ data class ErrorInfo(
     val message: String? = null,
     val blob: String? = null
 )
-
-// ─── Status / Info ──────────────────────────────────────────
 
 @Serializable
 data class ApiStatus(
@@ -40,8 +36,6 @@ data class ApiInfo(
     @SerialName("atom_enabled") val atomEnabled: Boolean = false
 )
 
-// ─── User ───────────────────────────────────────────────────
-
 @Serializable
 data class User(
     val username: String? = null,
@@ -55,11 +49,8 @@ data class User(
     @SerialName("media_count") val mediaCount: Int? = null,
     val biography: String? = null,
     @SerialName("is_private") val isPrivate: Boolean? = null,
-    @SerialName("is_business") val isBusiness: Boolean? = null,
-    val pronouns: Map<String, String>? = null
+    @SerialName("is_business") val isBusiness: Boolean? = null
 )
-
-// ─── Media ──────────────────────────────────────────────────
 
 @Serializable
 data class MediaItem(
@@ -68,8 +59,6 @@ data class MediaItem(
     @SerialName("video_thumbnail") val videoThumbnail: String? = null,
     @SerialName("alt_text") val altText: String? = null
 )
-
-// ─── Post ───────────────────────────────────────────────────
 
 @Serializable
 data class Post(
@@ -90,8 +79,6 @@ data class Post(
     @SerialName("error_type") val errorType: String? = null,
     @SerialName("error_info") val errorInfo: ErrorInfo? = null
 )
-
-// ─── Search Response ────────────────────────────────────────
 
 object EmptyObjectAsSearchUserListSerializer : KSerializer<List<SearchUser>> {
     private val delegate = ListSerializer(SearchUser.serializer())
@@ -130,8 +117,6 @@ data class SearchUser(
     @SerialName("is_verified") val isVerified: Boolean? = null
 )
 
-// ─── User Profile Response ──────────────────────────────────
-
 @Serializable
 data class UserProfileResponse(
     val posts: List<Post>? = null,
@@ -140,4 +125,19 @@ data class UserProfileResponse(
     @SerialName("has_errors") val hasErrors: Boolean? = null,
     @SerialName("error_type") val errorType: String? = null,
     @SerialName("error_info") val errorInfo: ErrorInfo? = null
+)
+
+@Serializable
+data class Comment(
+    val text: String? = null,
+    val timestamp: Long? = null,
+    val likes: Int? = null,
+    @SerialName("gif_media") val gifMedia: String? = null,
+    val user: User? = null
+)
+
+@Serializable
+data class CommentsResponse(
+    val items: List<Comment> = emptyList(),
+    @SerialName("end_cursor") val endCursor: String? = null
 )

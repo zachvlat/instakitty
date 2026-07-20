@@ -16,6 +16,12 @@ interface KittygramApi {
     @GET("api/post/{shortcode}")
     suspend fun getPost(@Path("shortcode") shortcode: String): Response<Post>
 
+    @GET("p/{shortcode}")
+    suspend fun getPostWithComments(
+        @Path("shortcode") shortcode: String,
+        @Query("json") json: String = "true"
+    ): Response<kotlinx.serialization.json.JsonElement>
+
     @GET("api/user/{username}")
     suspend fun getUser(
         @Path("username") username: String,

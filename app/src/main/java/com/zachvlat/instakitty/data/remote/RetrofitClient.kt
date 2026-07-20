@@ -33,6 +33,7 @@ object RetrofitClient {
 
         val client = OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
+            .addInterceptor(CommentsHtmlInterceptor(url))
             .addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)

@@ -2,12 +2,15 @@ package com.zachvlat.instakitty.data.remote
 
 import com.zachvlat.instakitty.data.local.SettingsDataStore
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.Json
 
 class KittygramRepository(private val dataStore: SettingsDataStore) {
 
     private var cachedClient: KittygramApi? = null
     private var cachedUrl: String = ""
     private var cachedToken: String = ""
+
+    private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
     private suspend fun getClient(): KittygramApi? {
         val url = dataStore.instanceUrl.first()
@@ -115,6 +118,33 @@ class KittygramRepository(private val dataStore: SettingsDataStore) {
             }
         } catch (e: Exception) {
             ApiResult.NetworkError(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun getComments(shortcode: String): ApiResult<CommentsResponse> {
+        val client = getClient() ?: return ApiResult.NetworkError("No instance configured")
+        return try {
+            val res = client.getPostWithComments(shortcode)
+            if (res.isSuccessful) {
+                val body = res.body()
+                if (body != null) {
+                    try {
+                        val comments = json.decodeFromJsonElement(
+                            CommentsResponse.serializer(),
+                            body
+                        )
+                        ApiResult.Success(comments)
+                    } catch (e: Exception) {
+                        ApiResult.Success(CommentsResponse())
+                    }
+                } else {
+                    ApiResult.Success(CommentsResponse())
+                }
+            } else {
+                ApiResult.Success(CommentsResponse())
+            }
+        } catch (e: Exception) {
+            ApiResult.Success(CommentsResponse())
         }
     }
 

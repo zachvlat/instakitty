@@ -9,7 +9,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -32,7 +31,7 @@ enum class BottomTab(val label: String, val route: String, val icon: ImageVector
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppNavigation(dataStore: SettingsDataStore) {
+fun AppNavigation(dataStore: SettingsDataStore, deepLinkRoute: String? = null) {
     val navController = rememberNavController()
     val isConfigured by dataStore.isConfigured.collectAsState(initial = null)
 
@@ -51,19 +50,38 @@ fun AppNavigation(dataStore: SettingsDataStore) {
 
     val showBottomBar = currentRoute != null && currentRoute != "setup"
 
+    var selectedTab by remember { mutableStateOf(BottomTab.Home) }
+
+    LaunchedEffect(deepLinkRoute) {
+        if (deepLinkRoute != null && startDestination == "home") {
+            navController.navigate(deepLinkRoute) {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = false
+                }
+                launchSingleTop = true
+            }
+            selectedTab = when {
+                deepLinkRoute.startsWith("user/") -> BottomTab.Following
+                deepLinkRoute.startsWith("post/") -> BottomTab.Following
+                else -> BottomTab.Home
+            }
+        }
+    }
+
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar {
                     BottomTab.entries.forEach { tab ->
-                        val selected = currentRoute == tab.route
                         NavigationBarItem(
-                            selected = selected,
+                            selected = tab == selectedTab,
                             onClick = {
+                                selectedTab = tab
                                 navController.navigate(tab.route) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    popUpTo(navController.graph.startDestinationId) {
+                                        inclusive = false
+                                    }
                                     launchSingleTop = true
-                                    restoreState = true
                                 }
                             },
                             icon = {

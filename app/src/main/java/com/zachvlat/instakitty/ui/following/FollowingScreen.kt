@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,14 +20,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,18 +136,21 @@ fun FollowingScreen(
                                         modifier = Modifier.padding(16.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        val picUrl = state.profilePics[username]
-                                        if (picUrl != null) {
-                                            AsyncImage(
-                                                model = picUrl,
-                                                contentDescription = null,
-                                                modifier = Modifier
-                                                    .size(40.dp)
-                                                    .clip(CircleShape),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                            Spacer(Modifier.width(12.dp))
+                                        Surface(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(CircleShape),
+                                            color = MaterialTheme.colorScheme.surfaceVariant
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Person,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
                                         }
+                                        Spacer(Modifier.width(12.dp))
                                         Text(
                                             text = username,
                                             style = MaterialTheme.typography.titleMedium,

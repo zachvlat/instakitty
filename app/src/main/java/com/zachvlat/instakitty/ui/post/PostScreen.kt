@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.zachvlat.instakitty.data.remote.Comment
 import com.zachvlat.instakitty.data.remote.MediaItem
 import com.zachvlat.instakitty.ui.components.VideoPlayer
 import com.zachvlat.instakitty.ui.components.ZoomableImage
@@ -96,9 +97,14 @@ fun PostScreen(
                             Spacer(Modifier.width(64.dp))
                         }
 
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            PostContent(state.post!!, onUserClick)
-                        }
+                Box(modifier = Modifier.fillMaxSize()) {
+                    PostContent(
+                        post = state.post!!,
+                        comments = state.comments,
+                        isLoadingComments = state.isLoadingComments,
+                        onUserClick = onUserClick
+                    )
+                }
                     }
                 }
             }
@@ -109,6 +115,8 @@ fun PostScreen(
 @Composable
 private fun PostContent(
     post: com.zachvlat.instakitty.data.remote.Post,
+    comments: List<Comment>,
+    isLoadingComments: Boolean,
     onUserClick: (String) -> Unit
 ) {
     Column(
@@ -168,6 +176,8 @@ private fun PostContent(
         }
 
         PostDetails(post, onUserClick)
+
+        CommentsSection(comments, isLoadingComments, onUserClick)
     }
 }
 
@@ -233,6 +243,111 @@ private fun PostDetails(
             )
         }
 
+    }
+}
+
+@Composable
+private fun CommentsSection(
+    comments: List<Comment>,
+    isLoading: Boolean,
+    onUserClick: (String) -> Unit
+) {
+    Column(modifier = Modifier.padding(16.dp)) {
+        HorizontalDivider()
+        Spacer(Modifier.height(12.dp))
+
+        Text(
+            text = "Comments",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.height(8.dp))
+
+        when {
+            isLoading -> {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .align(Alignment.CenterHorizontally)
+                )
+            }
+            comments.isEmpty() -> {
+                Text(
+                    text = "No comments",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            else -> {
+                comments.forEach { comment ->
+                    CommentItem(comment, onUserClick)
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommentItem(
+    comment: Comment,
+    onUserClick: (String) -> Unit
+) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        val pp = comment.user?.profilePicture ?: comment.user?.profilePicUrl
+        if (pp != null) {
+            AsyncImage(
+                model = pp,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(MaterialTheme.shapes.extraLarge),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(
+                    onClick = { comment.user?.username?.let(onUserClick) },
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.height(24.dp)
+                ) {
+                    Text(
+                        text = comment.user?.username ?: "unknown",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (comment.user?.isVerified == true) {
+                    Text(
+                        text = " ✓",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            if (!comment.text.isNullOrBlank()) {
+                Text(
+                    text = comment.text,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            if (comment.likes != null && comment.likes > 0) {
+                Text(
+                    text = "${comment.likes} like${if (comment.likes > 1) "s" else ""}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 
