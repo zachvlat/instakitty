@@ -30,4 +30,10 @@ interface KittygramApi {
 
     @GET("api/search")
     suspend fun search(@Query("query") query: String): Response<SearchResponse>
+
+    @GET("api/popular/{topic}")
+    suspend fun getPopular(
+        @Path("topic") topic: String,
+        @Query("cursor") cursor: String? = null
+    ): Response<ExploreResponse>
 }

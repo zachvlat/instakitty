@@ -21,6 +21,7 @@ class SettingsDataStore(private val context: Context) {
         private val API_TOKEN = stringPreferencesKey("api_token")
         private val FOLLOWED_USERS = stringPreferencesKey("followed_users")
         private val PROFILE_PICS = stringPreferencesKey("profile_pics")
+        private val FAVORITE_QUERIES = stringPreferencesKey("favorite_queries")
     }
 
     val instanceUrl: Flow<String> = context.dataStore.data.map { prefs ->
@@ -50,6 +51,15 @@ class SettingsDataStore(private val context: Context) {
             Json.decodeFromString<Map<String, String>>(raw)
         } catch (_: Exception) {
             emptyMap()
+        }
+    }
+
+    val favoriteQueries: Flow<List<String>> = context.dataStore.data.map { prefs ->
+        val raw = prefs[FAVORITE_QUERIES] ?: return@map emptyList()
+        try {
+            Json.decodeFromString<List<String>>(raw)
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 
@@ -116,6 +126,23 @@ class SettingsDataStore(private val context: Context) {
             }
             current[username] = url
             prefs[PROFILE_PICS] = Json.encodeToString(current)
+        }
+    }
+
+    suspend fun toggleFavoriteQuery(query: String) {
+        context.dataStore.edit { prefs ->
+            val raw = prefs[FAVORITE_QUERIES] ?: "[]"
+            val current = try {
+                Json.decodeFromString<MutableList<String>>(raw)
+            } catch (_: Exception) {
+                mutableListOf()
+            }
+            if (query in current) {
+                current.remove(query)
+            } else {
+                current.add(query)
+            }
+            prefs[FAVORITE_QUERIES] = Json.encodeToString(current)
         }
     }
 

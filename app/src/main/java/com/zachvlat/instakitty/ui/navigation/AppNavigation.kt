@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,6 +17,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.zachvlat.instakitty.data.local.SettingsDataStore
+import com.zachvlat.instakitty.ui.explore.ExploreScreen
 import com.zachvlat.instakitty.ui.following.FollowingScreen
 import com.zachvlat.instakitty.ui.home.HomeScreen
 import com.zachvlat.instakitty.ui.post.PostScreen
@@ -25,6 +27,7 @@ import com.zachvlat.instakitty.ui.user.UserScreen
 
 enum class BottomTab(val label: String, val route: String, val icon: ImageVector) {
     Home("Home", "home", Icons.Filled.Home),
+    Explore("Explore", "explore", Icons.Filled.Search),
     Following("Following", "following", Icons.Filled.Person),
     Settings("Settings", "settings", Icons.Filled.Settings)
 }
@@ -117,6 +120,13 @@ fun AppNavigation(dataStore: SettingsDataStore, deepLinkRoute: String? = null) {
                         navController.navigate("user/$username")
                     },
                     onNavigateToPost = { shortcode ->
+                        navController.navigate("post/$shortcode")
+                    }
+                )
+            }
+            composable("explore") {
+                ExploreScreen(
+                    onPostClick = { shortcode ->
                         navController.navigate("post/$shortcode")
                     }
                 )

@@ -11,6 +11,31 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 
 @Serializable
+data class ExploreItem(
+    val shortcode: String? = null,
+    val caption: String? = null,
+    @SerialName("play_count") val playCount: Long? = null,
+    val user: ExploreUser? = null,
+    val thumbnail: String? = null,
+    @SerialName("video_url") val videoUrl: String? = null
+)
+
+@Serializable
+data class ExploreUser(
+    val username: String? = null,
+    val id: String? = null,
+    @SerialName("is_verified") val isVerified: Boolean? = null,
+    @SerialName("profile_picture") val profilePicture: String? = null
+)
+
+@Serializable
+data class ExploreResponse(
+    val status: String? = null,
+    val items: List<ExploreItem> = emptyList(),
+    @SerialName("end_cursor") val endCursor: String? = null
+)
+
+@Serializable
 data class ApiError(
     @SerialName("has_errors") val hasErrors: Boolean = false,
     @SerialName("error_type") val errorType: String? = null,

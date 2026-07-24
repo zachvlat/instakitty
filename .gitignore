@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+/.kotlin/errors/errors-1784896804781.log
+*.apk
+*.aab
