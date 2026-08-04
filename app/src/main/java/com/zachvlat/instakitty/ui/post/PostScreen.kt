@@ -1,5 +1,6 @@
 package com.zachvlat.instakitty.ui.post
 
+import android.content.Intent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -11,12 +12,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -38,6 +41,7 @@ fun PostScreen(
     }
 
     val state by viewModel.state.collectAsState()
+    val context = LocalContext.current
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
@@ -68,6 +72,26 @@ fun PostScreen(
                     ) {
                         TextButton(onClick = onBack) { Text("←") }
                         Spacer(Modifier.weight(1f))
+                        state.post?.shortcode?.let { postCode ->
+                            IconButton(onClick = {
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(
+                                        Intent.EXTRA_TEXT,
+                                        "https://www.instagram.com/p/$postCode"
+                                    )
+                                }
+                                context.startActivity(
+                                    Intent.createChooser(shareIntent, "Share post")
+                                )
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Share,
+                                    contentDescription = "Share",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                         IconButton(onClick = viewModel::toggleSave) {
                             Icon(
                                 imageVector = if (state.isSaved) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
