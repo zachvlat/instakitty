@@ -19,12 +19,14 @@ data class PostUiState(
     val commentsEndCursor: String? = null,
     val isLoading: Boolean = true,
     val isLoadingComments: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val isSaved: Boolean = false
 )
 
 class PostViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = KittygramRepository(SettingsDataStore(application))
+    private val dataStore = SettingsDataStore(application)
+    private val repository = KittygramRepository(dataStore)
 
     private val _state = MutableStateFlow(PostUiState())
     val state: StateFlow<PostUiState> = _state.asStateFlow()
@@ -35,18 +37,29 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         currentShortcode = shortcode
         _state.value = PostUiState(isLoading = true)
         viewModelScope.launch {
+            val saved = shortcode in dataStore.getSavedPostsSnapshot()
             when (val result = repository.getPost(shortcode)) {
                 is ApiResult.Success -> {
-                    _state.value = PostUiState(post = result.data, isLoading = false)
+                    _state.value = PostUiState(post = result.data, isLoading = false, isSaved = saved)
                     loadComments(shortcode)
                 }
                 is ApiResult.Error -> {
-                    _state.value = PostUiState(isLoading = false, error = result.message)
+                    _state.value = PostUiState(isLoading = false, isSaved = saved, error = result.message)
                 }
                 is ApiResult.NetworkError -> {
-                    _state.value = PostUiState(isLoading = false, error = result.message)
+                    _state.value = PostUiState(isLoading = false, isSaved = saved, error = result.message)
                 }
             }
+        }
+    }
+
+    fun toggleSave() {
+        val sc = currentShortcode ?: return
+        viewModelScope.launch {
+            dataStore.toggleSavePost(sc)
+            _state.value = _state.value.copy(
+                isSaved = sc in dataStore.getSavedPostsSnapshot()
+            )
         }
     }
 

@@ -2,6 +2,7 @@ package com.zachvlat.instakitty.ui.navigation
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
@@ -21,6 +22,7 @@ import com.zachvlat.instakitty.ui.explore.ExploreScreen
 import com.zachvlat.instakitty.ui.following.FollowingScreen
 import com.zachvlat.instakitty.ui.home.HomeScreen
 import com.zachvlat.instakitty.ui.post.PostScreen
+import com.zachvlat.instakitty.ui.saved.SavedScreen
 import com.zachvlat.instakitty.ui.setup.SetupScreen
 import com.zachvlat.instakitty.ui.settings.SettingsScreen
 import com.zachvlat.instakitty.ui.user.UserScreen
@@ -29,6 +31,7 @@ enum class BottomTab(val label: String, val route: String, val icon: ImageVector
     Home("Home", "home", Icons.Filled.Home),
     Explore("Explore", "explore", Icons.Filled.Search),
     Following("Following", "following", Icons.Filled.Person),
+    Saved("Saved", "saved", Icons.Filled.Bookmark),
     Settings("Settings", "settings", Icons.Filled.Settings)
 }
 
@@ -137,6 +140,16 @@ fun AppNavigation(dataStore: SettingsDataStore, deepLinkRoute: String? = null) {
             composable("following") {
                 FollowingScreen(
                     onUserClick = { username ->
+                        navController.navigate("user/$username")
+                    }
+                )
+            }
+            composable("saved") {
+                SavedScreen(
+                    onOpenPost = { shortcode ->
+                        navController.navigate("post/$shortcode")
+                    },
+                    onOpenUser = { username ->
                         navController.navigate("user/$username")
                     }
                 )

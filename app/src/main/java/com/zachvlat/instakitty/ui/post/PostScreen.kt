@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -80,6 +82,22 @@ fun PostScreen(
                             .clickable(onClick = onBack)
                             .padding(8.dp)
                     )
+                    Icon(
+                        imageVector = if (state.isSaved) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                        contentDescription = if (state.isSaved) "Unsave" else "Save",
+                        tint = if (state.isSaved)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
+                            .clickable(onClick = viewModel::toggleSave)
+                            .padding(8.dp)
+                    )
                 } else {
                     Column(modifier = Modifier.fillMaxSize()) {
                         Row(
@@ -88,13 +106,16 @@ fun PostScreen(
                         ) {
                             TextButton(onClick = onBack) { Text("←") }
                             Spacer(Modifier.weight(1f))
-                            Text(
-                                text = "Post",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(Modifier.weight(1f))
-                            Spacer(Modifier.width(64.dp))
+                            IconButton(onClick = viewModel::toggleSave) {
+                                Icon(
+                                    imageVector = if (state.isSaved) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                                    contentDescription = if (state.isSaved) "Unsave" else "Save",
+                                    tint = if (state.isSaved)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
 
                 Box(modifier = Modifier.fillMaxSize()) {

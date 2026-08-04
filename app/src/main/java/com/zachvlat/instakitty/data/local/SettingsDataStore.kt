@@ -22,6 +22,7 @@ class SettingsDataStore(private val context: Context) {
         private val FOLLOWED_USERS = stringPreferencesKey("followed_users")
         private val PROFILE_PICS = stringPreferencesKey("profile_pics")
         private val FAVORITE_QUERIES = stringPreferencesKey("favorite_queries")
+        private val SAVED_POSTS = stringPreferencesKey("saved_posts")
     }
 
     val instanceUrl: Flow<String> = context.dataStore.data.map { prefs ->
@@ -60,6 +61,34 @@ class SettingsDataStore(private val context: Context) {
             Json.decodeFromString<List<String>>(raw)
         } catch (_: Exception) {
             emptyList()
+        }
+    }
+
+    val savedPosts: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        val raw = prefs[SAVED_POSTS] ?: return@map emptySet()
+        try {
+            Json.decodeFromString<Set<String>>(raw)
+        } catch (_: Exception) {
+            emptySet()
+        }
+    }
+
+    suspend fun getSavedPostsSnapshot(): Set<String> = savedPosts.first()
+
+    suspend fun toggleSavePost(shortcode: String) {
+        context.dataStore.edit { prefs ->
+            val raw = prefs[SAVED_POSTS] ?: "[]"
+            val current = try {
+                Json.decodeFromString<MutableSet<String>>(raw)
+            } catch (_: Exception) {
+                mutableSetOf()
+            }
+            if (shortcode in current) {
+                current.remove(shortcode)
+            } else {
+                current.add(shortcode)
+            }
+            prefs[SAVED_POSTS] = Json.encodeToString(current)
         }
     }
 
