@@ -1,7 +1,6 @@
 package com.zachvlat.instakitty.ui.following
 
 import android.content.Intent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,7 +18,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -27,7 +25,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FollowingScreen(
     onUserClick: (String) -> Unit,
@@ -97,64 +94,41 @@ fun FollowingScreen(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         items(visibleUsers, key = { it }) { username ->
-                            val dismissState = rememberSwipeToDismissBoxState(
-                                confirmValueChange = { value ->
-                                    if (value == SwipeToDismissBoxValue.EndToStart) {
-                                        viewModel.removeUser(username)
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                }
-                            )
-                            SwipeToDismissBox(
-                                state = dismissState,
-                                enableDismissFromStartToEnd = false,
-                                enableDismissFromEndToStart = true,
-                                backgroundContent = {
-                                    Box(
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onUserClick(username) }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
                                         modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(Color(0xFFE53935), shape = MaterialTheme.shapes.medium)
-                                            .padding(horizontal = 20.dp),
-                                        contentAlignment = Alignment.CenterEnd
+                                            .size(40.dp)
+                                            .clip(CircleShape),
+                                        color = MaterialTheme.colorScheme.surfaceVariant
                                     ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Person,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(
+                                        text = username,
+                                        modifier = Modifier.weight(1f),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    IconButton(onClick = { viewModel.removeUser(username) }) {
                                         Icon(
                                             imageVector = Icons.Filled.Delete,
                                             contentDescription = "Remove",
-                                            tint = Color.White
-                                        )
-                                    }
-                                }
-                            ) {
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { onUserClick(username) }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(16.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Surface(
-                                            modifier = Modifier
-                                                .size(40.dp)
-                                                .clip(CircleShape),
-                                            color = MaterialTheme.colorScheme.surfaceVariant
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.Person,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
-                                        Spacer(Modifier.width(12.dp))
-                                        Text(
-                                            text = username,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Medium
+                                            tint = MaterialTheme.colorScheme.error
                                         )
                                     }
                                 }

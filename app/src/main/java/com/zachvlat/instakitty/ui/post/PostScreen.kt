@@ -2,7 +2,6 @@ package com.zachvlat.instakitty.ui.post
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -10,7 +9,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material3.*
@@ -40,7 +38,6 @@ fun PostScreen(
     }
 
     val state by viewModel.state.collectAsState()
-    val isVideo = state.post?.videoUrl != null
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
@@ -64,68 +61,32 @@ fun PostScreen(
                 }
             }
             state.post != null -> {
-                if (isVideo) {
-                    VideoPlayer(
-                        videoUrl = state.post!!.videoUrl!!,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    Icon(
-                        imageVector = Icons.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(8.dp)
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
-                            .clickable(onClick = onBack)
-                            .padding(8.dp)
-                    )
-                    Icon(
-                        imageVector = if (state.isSaved) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-                        contentDescription = if (state.isSaved) "Unsave" else "Save",
-                        tint = if (state.isSaved)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
-                            .clickable(onClick = viewModel::toggleSave)
-                            .padding(8.dp)
-                    )
-                } else {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TextButton(onClick = onBack) { Text("←") }
-                            Spacer(Modifier.weight(1f))
-                            IconButton(onClick = viewModel::toggleSave) {
-                                Icon(
-                                    imageVector = if (state.isSaved) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-                                    contentDescription = if (state.isSaved) "Unsave" else "Save",
-                                    tint = if (state.isSaved)
-                                        MaterialTheme.colorScheme.primary
-                                    else
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = onBack) { Text("←") }
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = viewModel::toggleSave) {
+                            Icon(
+                                imageVector = if (state.isSaved) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                                contentDescription = if (state.isSaved) "Unsave" else "Save",
+                                tint = if (state.isSaved)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
+                    }
 
-                Box(modifier = Modifier.fillMaxSize()) {
-                    PostContent(
-                        post = state.post!!,
-                        comments = state.comments,
-                        isLoadingComments = state.isLoadingComments,
-                        onUserClick = onUserClick
-                    )
-                }
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        PostContent(
+                            post = state.post!!,
+                            comments = state.comments,
+                            isLoadingComments = state.isLoadingComments,
+                            onUserClick = onUserClick
+                        )
                     }
                 }
             }
@@ -185,6 +146,13 @@ private fun PostContent(
                     }
                 }
             }
+        } else if (post.videoUrl != null) {
+            VideoPlayer(
+                videoUrl = post.videoUrl,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(450.dp)
+            )
         } else if (mediaUrl != null) {
             ZoomableImage(
                 model = mediaUrl,

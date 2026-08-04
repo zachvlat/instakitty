@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -21,7 +22,8 @@ import com.zachvlat.instakitty.data.remote.Post
 fun PostCard(
     post: Post,
     onPostClick: (String) -> Unit,
-    onUserClick: (String) -> Unit
+    onUserClick: (String) -> Unit,
+    onDelete: (() -> Unit)? = null
 ) {
     Card(
         modifier = Modifier
@@ -61,7 +63,11 @@ fun PostCard(
                     }
                 }
                 Spacer(Modifier.width(8.dp))
-                Column(modifier = Modifier.clickable { post.user?.username?.let(onUserClick) }) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { post.user?.username?.let(onUserClick) }
+                ) {
                     Text(
                         text = post.user?.username ?: "unknown",
                         fontWeight = FontWeight.SemiBold,
@@ -74,6 +80,15 @@ fun PostCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                if (onDelete != null) {
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = "Remove",
+                            tint = MaterialTheme.colorScheme.error
                         )
                     }
                 }

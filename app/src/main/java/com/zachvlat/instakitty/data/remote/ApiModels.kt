@@ -31,6 +31,7 @@ data class ExploreUser(
 @Serializable
 data class ExploreResponse(
     val status: String? = null,
+    @Serializable(with = EmptyObjectAsExploreItemListSerializer::class)
     val items: List<ExploreItem> = emptyList(),
     @SerialName("end_cursor") val endCursor: String? = null
 )
@@ -120,6 +121,25 @@ object EmptyObjectAsSearchUserListSerializer : KSerializer<List<SearchUser>> {
     }
 
     override fun serialize(encoder: Encoder, value: List<SearchUser>) {
+        encoder.encodeSerializableValue(delegate, value)
+    }
+}
+
+object EmptyObjectAsExploreItemListSerializer : KSerializer<List<ExploreItem>> {
+    private val delegate = ListSerializer(ExploreItem.serializer())
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun deserialize(decoder: Decoder): List<ExploreItem> {
+        val input = decoder as JsonDecoder
+        val element = input.decodeJsonElement()
+        return if (element is JsonArray) {
+            input.json.decodeFromJsonElement(delegate, element)
+        } else {
+            emptyList()
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: List<ExploreItem>) {
         encoder.encodeSerializableValue(delegate, value)
     }
 }

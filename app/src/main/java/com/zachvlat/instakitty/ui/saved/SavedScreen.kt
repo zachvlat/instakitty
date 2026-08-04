@@ -1,6 +1,5 @@
 package com.zachvlat.instakitty.ui.saved
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,16 +9,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.zachvlat.instakitty.data.remote.Post
 import com.zachvlat.instakitty.ui.components.PostCard
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SavedScreen(
     onOpenPost: (String) -> Unit,
@@ -73,42 +69,12 @@ fun SavedScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(visiblePosts, key = { it.shortcode ?: it.id ?: it.hashCode() }) { post ->
-                            val dismissState = rememberSwipeToDismissBoxState(
-                                confirmValueChange = { value ->
-                                    if (value == SwipeToDismissBoxValue.EndToStart) {
-                                        post.shortcode?.let(viewModel::removeSaved)
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                }
+                            PostCard(
+                                post = post,
+                                onPostClick = onOpenPost,
+                                onUserClick = onOpenUser,
+                                onDelete = { post.shortcode?.let(viewModel::removeSaved) }
                             )
-                            SwipeToDismissBox(
-                                state = dismissState,
-                                enableDismissFromStartToEnd = false,
-                                enableDismissFromEndToStart = true,
-                                backgroundContent = {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(Color(0xFFE53935), shape = MaterialTheme.shapes.medium)
-                                            .padding(horizontal = 20.dp),
-                                        contentAlignment = Alignment.CenterEnd
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Delete,
-                                            contentDescription = "Remove",
-                                            tint = Color.White
-                                        )
-                                    }
-                                }
-                            ) {
-                                PostCard(
-                                    post = post,
-                                    onPostClick = onOpenPost,
-                                    onUserClick = onOpenUser
-                                )
-                            }
                         }
                     }
                 }
