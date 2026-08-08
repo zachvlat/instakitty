@@ -67,10 +67,15 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
             when (val result = repository.getUser(currentUsername, cursor)) {
                 is ApiResult.Success -> {
                     val current = _state.value
+                    val newPosts = (result.data.posts ?: emptyList())
+                        .filterNot { newPost ->
+                            current.posts.any { it.shortcode != null && it.shortcode == newPost.shortcode }
+                        }
+                    val nextEndCursor = if (newPosts.isEmpty()) null else result.data.endCursor
                     _state.value = current.copy(
-                        posts = current.posts + (result.data.posts ?: emptyList()),
+                        posts = current.posts + newPosts,
                         isLoadingMore = false,
-                        endCursor = result.data.endCursor
+                        endCursor = nextEndCursor
                     )
                 }
                 else -> {
