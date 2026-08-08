@@ -1,5 +1,6 @@
 package com.zachvlat.instakitty.ui.components
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,31 +21,49 @@ fun ZoomableImage(
     model: Any?,
     contentDescription: String?,
     modifier: Modifier = Modifier,
-    contentScale: ContentScale = ContentScale.Fit
+    contentScale: ContentScale = ContentScale.Fit,
+    onTap: (() -> Unit)? = null
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
 
     Box(
-        modifier = modifier.pointerInput(Unit) {
-            detectTransformGestures { _, pan, zoom, _ ->
-                scale = (scale * zoom).coerceIn(1f, 5f)
-                if (scale == 1f) {
-                    offsetX = 0f
-                    offsetY = 0f
-                } else {
-                    offsetX = (offsetX + pan.x).coerceIn(
-                        -(scale - 1f) * size.width / 2,
-                        (scale - 1f) * size.width / 2
-                    )
-                    offsetY = (offsetY + pan.y).coerceIn(
-                        -(scale - 1f) * size.height / 2,
-                        (scale - 1f) * size.height / 2
-                    )
+        modifier = modifier
+            .pointerInput(Unit) {
+                detectTransformGestures { _, pan, zoom, _ ->
+                    scale = (scale * zoom).coerceIn(1f, 5f)
+                    if (scale == 1f) {
+                        offsetX = 0f
+                        offsetY = 0f
+                    } else {
+                        offsetX = (offsetX + pan.x).coerceIn(
+                            -(scale - 1f) * size.width / 2,
+                            (scale - 1f) * size.width / 2
+                        )
+                        offsetY = (offsetY + pan.y).coerceIn(
+                            -(scale - 1f) * size.height / 2,
+                            (scale - 1f) * size.height / 2
+                        )
+                    }
                 }
             }
-        },
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { onTap?.invoke() },
+                    onDoubleTap = {
+                        if (scale > 1f) {
+                            scale = 1f
+                            offsetX = 0f
+                            offsetY = 0f
+                        } else {
+                            scale = 3f
+                            offsetX = 0f
+                            offsetY = 0f
+                        }
+                    }
+                )
+            },
         contentAlignment = Alignment.Center
     ) {
         AsyncImage(

@@ -50,6 +50,9 @@ class MainActivity : ComponentActivity() {
             segments.size == 2 && segments[0] == "p" -> {
                 "post/${segments[1]}"
             }
+            segments.size == 2 && segments[0] == "reel" -> {
+                "post/${segments[1]}"
+            }
             segments.size == 3 && segments[1] == "p" -> {
                 "post/${segments[2]}"
             }

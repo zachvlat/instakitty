@@ -42,7 +42,8 @@ import androidx.media3.ui.PlayerView
 @Composable
 fun VideoPlayer(
     videoUrl: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showFullscreenButton: Boolean = true
 ) {
     val context = LocalContext.current
     var isFullscreen by remember { mutableStateOf(false) }
@@ -99,7 +100,7 @@ fun VideoPlayer(
                         factory = { playerView },
                         modifier = Modifier.fillMaxSize()
                     )
-                    FullscreenButton(
+                    MediaFullscreenButton(
                         icon = Icons.Filled.FullscreenExit,
                         contentDescription = "Exit fullscreen",
                         onClick = exitFullscreen,
@@ -112,18 +113,20 @@ fun VideoPlayer(
                 factory = { playerView },
                 modifier = Modifier.fillMaxSize()
             )
-            FullscreenButton(
-                icon = Icons.Filled.Fullscreen,
-                contentDescription = "Fullscreen",
-                onClick = { isFullscreen = true },
-                modifier = Modifier.align(Alignment.BottomEnd)
-            )
+            if (showFullscreenButton) {
+                MediaFullscreenButton(
+                    icon = Icons.Filled.Fullscreen,
+                    contentDescription = "Fullscreen",
+                    onClick = { isFullscreen = true },
+                    modifier = Modifier.align(Alignment.BottomEnd)
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun FullscreenButton(
+internal fun MediaFullscreenButton(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
@@ -146,7 +149,7 @@ private fun FullscreenButton(
     }
 }
 
-private tailrec fun Context.findActivity(): Activity? = when (this) {
+internal tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null

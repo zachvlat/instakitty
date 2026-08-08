@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,8 +27,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.zachvlat.instakitty.data.remote.Comment
 import com.zachvlat.instakitty.data.remote.MediaItem
+import com.zachvlat.instakitty.ui.components.FullscreenImageViewer
+import com.zachvlat.instakitty.ui.components.ImagePage
+import com.zachvlat.instakitty.ui.components.MediaFullscreenButton
 import com.zachvlat.instakitty.ui.components.VideoPlayer
-import com.zachvlat.instakitty.ui.components.ZoomableImage
 
 @Composable
 fun PostScreen(
@@ -42,6 +45,9 @@ fun PostScreen(
 
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+
+    var viewerPages by remember { mutableStateOf<List<ImagePage>?>(null) }
+    var viewerInitialPage by remember { mutableIntStateOf(0) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
@@ -109,12 +115,24 @@ fun PostScreen(
                             post = state.post!!,
                             comments = state.comments,
                             isLoadingComments = state.isLoadingComments,
-                            onUserClick = onUserClick
+                            onUserClick = onUserClick,
+                            onOpenViewer = { pages, index ->
+                                viewerPages = pages
+                                viewerInitialPage = index
+                            }
                         )
                     }
                 }
             }
         }
+    }
+
+    viewerPages?.let { pages ->
+        FullscreenImageViewer(
+            pages = pages,
+            initialPage = viewerInitialPage,
+            onDismiss = { viewerPages = null }
+        )
     }
 }
 
@@ -123,7 +141,8 @@ private fun PostContent(
     post: com.zachvlat.instakitty.data.remote.Post,
     comments: List<Comment>,
     isLoadingComments: Boolean,
-    onUserClick: (String) -> Unit
+    onUserClick: (String) -> Unit,
+    onOpenViewer: (List<ImagePage>, Int) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -135,6 +154,9 @@ private fun PostContent(
 
         if (!post.images.isNullOrEmpty()) {
             val pagerState = rememberPagerState(pageCount = { post.images.size })
+            val pages = remember(post.images) {
+                post.images.map { ImagePage(it.imageUrl, it.videoUrl, it.altText) }
+            }
 
             Box(modifier = Modifier
                 .fillMaxWidth()
@@ -169,6 +191,13 @@ private fun PostContent(
                         }
                     }
                 }
+
+                MediaFullscreenButton(
+                    icon = Icons.Filled.Fullscreen,
+                    contentDescription = "Fullscreen",
+                    onClick = { onOpenViewer(pages, pagerState.currentPage) },
+                    modifier = Modifier.align(Alignment.BottomEnd)
+                )
             }
         } else if (post.videoUrl != null) {
             VideoPlayer(
@@ -178,14 +207,22 @@ private fun PostContent(
                     .height(450.dp)
             )
         } else if (mediaUrl != null) {
-            ZoomableImage(
-                model = mediaUrl,
-                contentDescription = post.altText ?: "Post media",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 500.dp),
-                contentScale = ContentScale.Fit
-            )
+            Box(modifier = Modifier.fillMaxWidth()) {
+                AsyncImage(
+                    model = mediaUrl,
+                    contentDescription = post.altText ?: "Post media",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 500.dp),
+                    contentScale = ContentScale.Fit
+                )
+                MediaFullscreenButton(
+                    icon = Icons.Filled.Fullscreen,
+                    contentDescription = "Fullscreen",
+                    onClick = { onOpenViewer(listOf(ImagePage(mediaUrl, null, post.altText)), 0) },
+                    modifier = Modifier.align(Alignment.BottomEnd)
+                )
+            }
         }
 
         PostDetails(post, onUserClick)
