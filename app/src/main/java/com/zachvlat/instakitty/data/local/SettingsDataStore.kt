@@ -6,13 +6,21 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.zachvlat.instakitty.data.remote.Post
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+
+@Serializable
+data class CachedUserPosts(
+    val fetchedAt: Long,
+    val posts: List<Post>
+)
 
 class SettingsDataStore(private val context: Context) {
 
@@ -23,6 +31,7 @@ class SettingsDataStore(private val context: Context) {
         private val PROFILE_PICS = stringPreferencesKey("profile_pics")
         private val FAVORITE_QUERIES = stringPreferencesKey("favorite_queries")
         private val SAVED_POSTS = stringPreferencesKey("saved_posts")
+        private val USER_POSTS_CACHE = stringPreferencesKey("user_posts_cache")
     }
 
     val instanceUrl: Flow<String> = context.dataStore.data.map { prefs ->
@@ -74,6 +83,21 @@ class SettingsDataStore(private val context: Context) {
     }
 
     suspend fun getSavedPostsSnapshot(): Set<String> = savedPosts.first()
+
+    suspend fun getUserPostsCacheSnapshot(): Map<String, CachedUserPosts> {
+        val raw = context.dataStore.data.first()[USER_POSTS_CACHE] ?: return emptyMap()
+        return try {
+            Json.decodeFromString<Map<String, CachedUserPosts>>(raw)
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    suspend fun saveUserPostsCache(entries: Map<String, CachedUserPosts>) {
+        context.dataStore.edit { prefs ->
+            prefs[USER_POSTS_CACHE] = Json.encodeToString(entries)
+        }
+    }
 
     suspend fun toggleSavePost(shortcode: String) {
         context.dataStore.edit { prefs ->
