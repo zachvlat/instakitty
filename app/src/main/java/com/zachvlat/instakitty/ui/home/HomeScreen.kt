@@ -3,14 +3,15 @@ package com.zachvlat.instakitty.ui.home
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
@@ -43,21 +44,13 @@ fun HomeScreen(
     val sheetState = rememberModalBottomSheetState()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            TodaySection(
-                items = state.todayPosts,
-                isLoading = state.isLoadingToday,
-                error = state.todayError,
-                onRefresh = viewModel::refreshToday,
-                onPostClick = onNavigateToPost
-            )
-        }
+        TodaySection(
+            items = state.todayPosts,
+            isLoading = state.isLoadingToday,
+            error = state.todayError,
+            onRefresh = viewModel::refreshToday,
+            onPostClick = onNavigateToPost
+        )
 
         FloatingActionButton(
             onClick = { showSearch = true },
@@ -250,61 +243,71 @@ private fun TodaySection(
     onRefresh: () -> Unit,
     onPostClick: (String) -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        contentPadding = PaddingValues(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Text(
-            text = "Recents",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.weight(1f))
-        IconButton(onClick = onRefresh) {
-            Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
-        }
-    }
-
-    when {
-        isLoading -> {
-            Box(
+        item(span = { GridItemSpan(3) }) {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Recents",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = onRefresh) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
+                    }
+                }
+                when {
+                    isLoading -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        }
+                    }
+                    error != null -> {
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
+                        TextButton(onClick = onRefresh) { Text("Retry") }
+                    }
+                    items.isEmpty() -> {
+                        Text(
+                            text = "No recent posts from people you follow",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                }
             }
         }
-        error != null -> {
-            Text(
-                text = error,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                textAlign = TextAlign.Center
-            )
-            TextButton(onClick = onRefresh) { Text("Retry") }
-        }
-        items.isEmpty() -> {
-            Text(
-                text = "No recent posts from people you follow",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-        }
-        else -> {
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(items, key = { postKey(it.post) }) { item ->
-                    TodayPostCard(
-                        item = item,
-                        onPostClick = onPostClick
-                    )
-                }
+
+        if (!isLoading && error == null) {
+            gridItems(items, key = { postKey(it.post) }) { item ->
+                TodayPostCard(
+                    item = item,
+                    onPostClick = onPostClick
+                )
             }
         }
     }
@@ -320,50 +323,44 @@ private fun TodayPostCard(
         ?: post.images?.firstOrNull()?.imageUrl
         ?: post.videoThumbnail
 
-    Card(
+    Box(
         modifier = Modifier
-            .width(180.dp)
+            .aspectRatio(1f)
             .clickable { post.shortcode?.let(onPostClick) }
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-        ) {
-            if (imageUrl != null) {
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = post.caption ?: "Post",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("?", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+        if (imageUrl != null) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = post.caption ?: "Post",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text("?", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            if (post.videoUrl != null) {
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.dp)
-                        .size(24.dp),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Filled.PlayArrow,
-                            contentDescription = "Video",
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+        }
+        if (post.videoUrl != null) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .size(24.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = "Video",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
         }
