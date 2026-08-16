@@ -23,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -30,7 +32,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.zachvlat.instakitty.R
 import com.zachvlat.instakitty.data.remote.User
+
+private val Calligraphy = FontFamily(
+    Font(R.font.great_vibes, FontWeight.Normal)
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,13 +51,26 @@ fun HomeScreen(
     val sheetState = rememberModalBottomSheetState()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        TodaySection(
-            items = state.todayPosts,
-            isLoading = state.isLoadingToday,
-            error = state.todayError,
-            onRefresh = viewModel::refreshToday,
-            onPostClick = onNavigateToPost
-        )
+        Column(modifier = Modifier.fillMaxSize()) {
+            Text(
+                text = "InstaKitty",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, bottom = 4.dp),
+                fontFamily = Calligraphy,
+                fontSize = 34.sp,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center
+            )
+            TodaySection(
+                items = state.todayPosts,
+                isLoading = state.isLoadingToday,
+                error = state.todayError,
+                onRefresh = viewModel::refreshToday,
+                onPostClick = onNavigateToPost,
+                modifier = Modifier.weight(1f)
+            )
+        }
 
         FloatingActionButton(
             onClick = { showSearch = true },
@@ -241,27 +261,27 @@ private fun TodaySection(
     isLoading: Boolean,
     error: String?,
     onRefresh: () -> Unit,
-    onPostClick: (String) -> Unit
+    onPostClick: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     LazyVerticalGrid(
+        modifier = modifier,
         columns = GridCells.Fixed(3),
         contentPadding = PaddingValues(2.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         item(span = { GridItemSpan(3) }) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 24.dp, end = 24.dp, top = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "Recents",
-                        fontSize = 20.sp,
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(Modifier.weight(1f))
@@ -270,22 +290,25 @@ private fun TodaySection(
                     }
                 }
                 when {
-                    isLoading -> {
+                    isLoading && items.isEmpty() -> {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(24.dp),
+                                .padding(vertical = 32.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            CircularProgressIndicator(modifier = Modifier.size(32.dp))
                         }
                     }
-                    error != null -> {
+                    error != null && items.isEmpty() -> {
                         Text(
                             text = error,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 8.dp)
                         )
                         TextButton(onClick = onRefresh) { Text("Retry") }
                     }
@@ -295,20 +318,23 @@ private fun TodaySection(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(vertical = 8.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 8.dp)
                         )
                     }
+                }
+                if (isLoading && items.isNotEmpty()) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
             }
         }
 
-        if (!isLoading && error == null) {
-            gridItems(items, key = { postKey(it.post) }) { item ->
-                TodayPostCard(
-                    item = item,
-                    onPostClick = onPostClick
-                )
-            }
+        gridItems(items, key = { postKey(it.post) }) { item ->
+            TodayPostCard(
+                item = item,
+                onPostClick = onPostClick
+            )
         }
     }
 }
