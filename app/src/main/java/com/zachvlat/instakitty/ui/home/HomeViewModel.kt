@@ -10,9 +10,6 @@ import com.zachvlat.instakitty.data.remote.KittygramRepository
 import com.zachvlat.instakitty.data.remote.Post
 import com.zachvlat.instakitty.data.remote.User
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,14 +17,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import java.util.concurrent.atomic.AtomicInteger
 
 data class HomePostItem(
     val post: Post,
     val username: String
 )
+
+private sealed interface UserFetch {
+    data class Success(val items: List<HomePostItem>) : UserFetch
+    object RateLimited : UserFetch
+    object Failed : UserFetch
+}
 
 data class HomeUiState(
     val searchQuery: String = "",
@@ -48,12 +49,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
     private var searchJob: Job? = null
+    private var retryJob: Job? = null
 
     init {
         refreshToday()
     }
 
     fun refreshToday() {
+        retryJob?.cancel()
         viewModelScope.launch { loadTodayPosts() }
     }
 
@@ -67,7 +70,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val cache = dataStore.getUserPostsCacheSnapshot()
         val now = System.currentTimeMillis()
         val cutoff = now - RECENT_DAYS * DAY_MILLIS
-        val semaphore = Semaphore(8)
 
         val freshKeys = followed.filter { username ->
             cache[username.lowercase()]?.let { now - it.fetchedAt < CACHE_TTL_MILLIS } == true
@@ -75,7 +77,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val staleKeys = followed.filter { it !in freshKeys }
 
         _state.update { current ->
-            val cached = freshKeys.flatMap { username ->
+            val cached = followed.flatMap { username ->
                 cache[username.lowercase()]?.posts.orEmpty()
                     .map { HomePostItem(post = it, username = username) }
             }
@@ -90,55 +92,88 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
+        // Check the newest posts first: fetch users most likely to have new
+        // content (based on their cached newest post), so the newest region of
+        // the feed fills in before we touch the rest. Stop as soon as the feed
+        // is full enough that the remaining users can't add anything newer.
+        val ordered = staleKeys
+            .sortedByDescending { username ->
+                cache[username.lowercase()]?.posts
+                    ?.maxOfOrNull { it.timestamp ?: 0L } ?: 0L
+            }
+            .take(MAX_USERS_PER_REFRESH)
+
         val successes = AtomicInteger(0)
-        val fetched = try {
-            coroutineScope {
-                staleKeys.map { username ->
-                    async {
-                        semaphore.withPermit {
-                            val posts = fetchPostsForUser(username)
-                            if (posts != null) {
-                                successes.incrementAndGet()
-                                val result = pickPostsForUser(posts, cutoff)
-                                if (result.isNotEmpty()) {
-                                    _state.update { current ->
-                                        current.copy(
-                                            todayPosts = mergePosts(current.todayPosts + result)
-                                        )
-                                    }
-                                }
-                                username.lowercase() to CachedUserPosts(now, posts.map { it.post })
-                            } else {
-                                null
-                            }
+        val fetched = mutableMapOf<String, CachedUserPosts>()
+        var rateLimited = false
+
+        for (username in ordered) {
+            delay(STAGGER_MILLIS)
+            when (val outcome = fetchPostsForUser(username)) {
+                is UserFetch.Success -> {
+                    successes.incrementAndGet()
+                    val picked = pickPostsForUser(outcome.items, cutoff)
+                    if (picked.isNotEmpty()) {
+                        _state.update { current ->
+                            current.copy(
+                                todayPosts = mergePosts(current.todayPosts + picked)
+                            )
                         }
                     }
-                }.awaitAll().filterNotNull()
+                    fetched[username.lowercase()] =
+                        CachedUserPosts(now, outcome.items.map { it.post })
+
+                    if (feedIsComplete(cache, ordered, fetched.keys, cutoff)) break
+                }
+                UserFetch.RateLimited -> {
+                    // Stop hammering the instance; it'll stay blocked as long as
+                    // we keep firing requests. Retry later with a single poke.
+                    rateLimited = true
+                    break
+                }
+                UserFetch.Failed -> Unit
             }
-        } catch (e: Exception) {
-            _state.value = _state.value.copy(
-                isLoadingToday = false,
-                todayError = e.message ?: "Failed to load recent posts"
-            )
-            return
         }
-        dataStore.saveUserPostsCache(cache + fetched.toMap())
+
+        dataStore.saveUserPostsCache(cache + fetched)
         _state.value = _state.value.copy(
             isLoadingToday = false,
-            todayError = if (successes.get() == 0 && freshKeys.isEmpty()) {
-                "Couldn't reach the instance. Check that it's online and on the same network."
-            } else {
-                null
+            todayError = when {
+                rateLimited && successes.get() == 0 && freshKeys.isEmpty() ->
+                    "Instagram is rate-limiting the instance. Retrying in a minute..."
+                successes.get() == 0 && freshKeys.isEmpty() ->
+                    "Couldn't reach the instance. Check that it's online and on the same network."
+                else -> null
             }
         )
+
+        if (rateLimited) {
+            retryJob?.cancel()
+            retryJob = viewModelScope.launch {
+                delay(RETRY_DELAY_MILLIS)
+                loadTodayPosts()
+            }
+        }
     }
 
-    private suspend fun fetchPostsForUser(username: String): List<HomePostItem>? {
+    private suspend fun fetchPostsForUser(username: String): UserFetch {
         val resp = repository.getUser(username)
-        if (resp !is ApiResult.Success) return null
-        return resp.data.posts.orEmpty()
-            .map { HomePostItem(post = it, username = username) }
+        if (resp is ApiResult.Success) {
+            return UserFetch.Success(
+                resp.data.posts.orEmpty()
+                    .map { HomePostItem(post = it, username = username) }
+            )
+        }
+        if (resp is ApiResult.Error && isRateLimited(resp)) {
+            return UserFetch.RateLimited
+        }
+        return UserFetch.Failed
     }
+
+    private fun isRateLimited(error: ApiResult.Error): Boolean =
+        error.type.contains("503", ignoreCase = true) ||
+            error.type.contains("ratelimit", ignoreCase = true) ||
+            error.message.contains("rate", ignoreCase = true)
 
     private fun pickPostsForUser(posts: List<HomePostItem>, cutoff: Long): List<HomePostItem> {
         val recent = posts.filter { it.post.timestamp != null && isRecent(it.post.timestamp, cutoff) }
@@ -160,16 +195,38 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             ?: post.videoThumbnail
             ?: "post_${post.hashCode()}"
 
-    private fun isRecent(timestamp: Long, cutoff: Long): Boolean {
-        val millis = if (timestamp > 10_000_000_000L) timestamp else timestamp * 1000L
-        return millis >= cutoff
+    private fun feedIsComplete(
+        cache: Map<String, CachedUserPosts>,
+        ordered: List<String>,
+        fetchedKeys: Set<String>,
+        cutoff: Long
+    ): Boolean {
+        val recents = _state.value.todayPosts.filter {
+            it.post.timestamp != null && isRecent(it.post.timestamp, cutoff)
+        }
+        if (recents.size < ENOUGH_RECENT) return false
+        val threshold = recents.minOf { postMillis(it.post.timestamp ?: 0L) }
+        val next = ordered.firstOrNull { it.lowercase() !in fetchedKeys } ?: return true
+        val nextNewest = cache[next.lowercase()]?.posts?.maxOfOrNull { it.timestamp ?: 0L }
+            ?: return false
+        return postMillis(nextNewest) < threshold
     }
+
+    private fun postMillis(timestamp: Long): Long =
+        if (timestamp > 10_000_000_000L) timestamp else timestamp * 1000L
+
+    private fun isRecent(timestamp: Long, cutoff: Long): Boolean =
+        postMillis(timestamp) >= cutoff
 
     companion object {
         private const val DAY_MILLIS = 24L * 60 * 60 * 1000
         private const val RECENT_DAYS = 7
         private const val USER_FILL_TARGET = 3
-        private const val CACHE_TTL_MILLIS = 15L * 60 * 1000
+        private const val CACHE_TTL_MILLIS = 60L * 60 * 1000
+        private const val STAGGER_MILLIS = 400L
+        private const val ENOUGH_RECENT = 24
+        private const val MAX_USERS_PER_REFRESH = 12
+        private const val RETRY_DELAY_MILLIS = 60_000L
     }
 
     fun onSearchQueryChange(query: String) {
