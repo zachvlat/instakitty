@@ -348,6 +348,7 @@ private fun TodayPostCard(
     val imageUrl = post.imageUrl
         ?: post.images?.firstOrNull()?.imageUrl
         ?: post.videoThumbnail
+        ?: post.thumbnail
 
     Box(
         modifier = Modifier
@@ -371,7 +372,7 @@ private fun TodayPostCard(
                 }
             }
         }
-        if (post.videoUrl != null) {
+        if (post.videoUrl != null || post.kind == "reel") {
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -400,4 +401,5 @@ private fun postKey(post: com.zachvlat.instakitty.data.remote.Post): String =
         ?: post.images?.firstOrNull()?.imageUrl
         ?: post.videoUrl
         ?: post.videoThumbnail
+        ?: post.thumbnail
         ?: "post_${post.hashCode()}"

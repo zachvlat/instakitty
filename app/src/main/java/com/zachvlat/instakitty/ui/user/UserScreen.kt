@@ -216,7 +216,7 @@ private fun ProfilePostThumbnail(
     onClick: () -> Unit
 ) {
     val mediaUrl = post.imageUrl ?: post.images?.firstOrNull()?.imageUrl
-        ?: post.videoThumbnail
+        ?: post.videoThumbnail ?: post.thumbnail
 
     Box(
         modifier = Modifier
@@ -240,7 +240,7 @@ private fun ProfilePostThumbnail(
                 }
             }
         }
-        if (post.videoUrl != null) {
+        if (post.videoUrl != null || post.kind == "reel") {
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopEnd)

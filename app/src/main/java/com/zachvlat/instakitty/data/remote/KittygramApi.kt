@@ -22,11 +22,11 @@ interface KittygramApi {
         @Query("json") json: String = "true"
     ): Response<kotlinx.serialization.json.JsonElement>
 
-    @GET("api/user/{username}")
+    @GET("api/users/grid/{username}")
     suspend fun getUser(
         @Path("username") username: String,
         @Query("cursor") cursor: String? = null
-    ): Response<UserProfileResponse>
+    ): Response<UserProfileGridResponse>
 
     @GET("api/search")
     suspend fun search(@Query("query") query: String): Response<SearchResponse>

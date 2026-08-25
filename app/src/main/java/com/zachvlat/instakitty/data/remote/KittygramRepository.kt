@@ -171,7 +171,7 @@ class KittygramRepository(private val dataStore: SettingsDataStore) {
         }
     }
 
-    suspend fun getUser(username: String, cursor: String? = null): ApiResult<UserProfileResponse> {
+    suspend fun getUser(username: String, cursor: String? = null): ApiResult<UserProfileGridResponse> {
         val client = getClient() ?: return ApiResult.NetworkError("No instance configured")
         return try {
             val res = client.getUser(username, cursor)

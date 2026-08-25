@@ -99,6 +99,8 @@ data class Post(
     @SerialName("video_thumbnail") val videoThumbnail: String? = null,
     @SerialName("view_count") val viewCount: Int? = null,
     @SerialName("image_url") val imageUrl: String? = null,
+    val thumbnail: String? = null,
+    val kind: String? = null,
     val images: List<MediaItem>? = null,
     @SerialName("comment_count") val commentCount: Int? = null,
     @SerialName("has_errors") val hasErrors: Boolean? = null,
@@ -167,6 +169,22 @@ data class UserProfileResponse(
     val posts: List<Post>? = null,
     @SerialName("user_info") val userInfo: User? = null,
     @SerialName("end_cursor") val endCursor: String? = null,
+    @SerialName("has_errors") val hasErrors: Boolean? = null,
+    @SerialName("error_type") val errorType: String? = null,
+    @SerialName("error_info") val errorInfo: ErrorInfo? = null
+)
+
+@Serializable
+data class GridData(
+    val items: List<Post> = emptyList(),
+    val cursor: String? = null
+)
+
+@Serializable
+data class UserProfileGridResponse(
+    val info: User? = null,
+    val grid: GridData? = null,
+    val status: String? = null,
     @SerialName("has_errors") val hasErrors: Boolean? = null,
     @SerialName("error_type") val errorType: String? = null,
     @SerialName("error_info") val errorInfo: ErrorInfo? = null

@@ -160,7 +160,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val resp = repository.getUser(username)
         if (resp is ApiResult.Success) {
             return UserFetch.Success(
-                resp.data.posts.orEmpty()
+                (resp.data.grid?.items).orEmpty()
                     .map { HomePostItem(post = it, username = username) }
             )
         }
@@ -193,6 +193,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             ?: post.images?.firstOrNull()?.imageUrl
             ?: post.videoUrl
             ?: post.videoThumbnail
+            ?: post.thumbnail
             ?: "post_${post.hashCode()}"
 
     private fun feedIsComplete(

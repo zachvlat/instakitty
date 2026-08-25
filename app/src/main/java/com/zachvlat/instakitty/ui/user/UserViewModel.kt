@@ -42,10 +42,10 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
             when (val result = repository.getUser(username)) {
                 is ApiResult.Success -> {
                     _state.value = UserUiState(
-                        user = result.data.userInfo,
-                        posts = result.data.posts ?: emptyList(),
+                        user = result.data.info,
+                        posts = result.data.grid?.items ?: emptyList(),
                         isLoading = false,
-                        endCursor = result.data.endCursor,
+                        endCursor = result.data.grid?.cursor,
                         isFollowing = username in followed
                     )
                 }
@@ -67,11 +67,11 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
             when (val result = repository.getUser(currentUsername, cursor)) {
                 is ApiResult.Success -> {
                     val current = _state.value
-                    val newPosts = (result.data.posts ?: emptyList())
+                    val newPosts = (result.data.grid?.items ?: emptyList())
                         .filterNot { newPost ->
                             current.posts.any { it.shortcode != null && it.shortcode == newPost.shortcode }
                         }
-                    val nextEndCursor = if (newPosts.isEmpty()) null else result.data.endCursor
+                    val nextEndCursor = if (newPosts.isEmpty()) null else result.data.grid?.cursor
                     _state.value = current.copy(
                         posts = current.posts + newPosts,
                         isLoadingMore = false,
