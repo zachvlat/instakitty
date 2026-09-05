@@ -196,4 +196,30 @@ class KittygramRepository(private val dataStore: SettingsDataStore) {
             ApiResult.NetworkError(e.message ?: "Network error")
         }
     }
+
+    suspend fun getUserTimeline(username: String, cursor: String? = null): ApiResult<UserTimelineResponse> {
+        val client = getClient() ?: return ApiResult.NetworkError("No instance configured")
+        return try {
+            val res = client.getUserTimeline(username, cursor)
+            if (res.isSuccessful) {
+                val body = res.body()
+                if (body != null) {
+                    if (body.hasErrors == true) {
+                        ApiResult.Error(
+                            body.errorType ?: "unknown",
+                            body.errorInfo?.message ?: "Unknown error"
+                        )
+                    } else {
+                        ApiResult.Success(body)
+                    }
+                } else {
+                    ApiResult.NetworkError("Empty response")
+                }
+            } else {
+                ApiResult.Error("http_${res.code()}", res.message())
+            }
+        } catch (e: Exception) {
+            ApiResult.NetworkError(e.message ?: "Network error")
+        }
+    }
 }

@@ -191,6 +191,16 @@ data class UserProfileGridResponse(
 )
 
 @Serializable
+data class UserTimelineResponse(
+    val info: User? = null,
+    val timeline: GridData? = null,
+    val status: String? = null,
+    @SerialName("has_errors") val hasErrors: Boolean? = null,
+    @SerialName("error_type") val errorType: String? = null,
+    @SerialName("error_info") val errorInfo: ErrorInfo? = null
+)
+
+@Serializable
 data class Comment(
     val text: String? = null,
     val timestamp: Long? = null,

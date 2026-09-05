@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.AtomicInteger
 
 data class HomePostItem(
     val post: Post,
@@ -50,14 +49,26 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private var searchJob: Job? = null
     private var retryJob: Job? = null
+    private var refreshJob: Job? = null
 
     init {
-        refreshToday()
+        viewModelScope.launch {
+            // Reload whenever the followed list changes (imports, new follows),
+            // and on first collection as the initial load.
+            var lastUsers: Set<String>? = null
+            dataStore.followedUsers.collect { users ->
+                if (users != lastUsers) {
+                    lastUsers = users
+                    refreshToday()
+                }
+            }
+        }
     }
 
     fun refreshToday() {
         retryJob?.cancel()
-        viewModelScope.launch { loadTodayPosts() }
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch { loadTodayPosts() }
     }
 
     private suspend fun loadTodayPosts() {
@@ -92,26 +103,30 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        // Check the newest posts first: fetch users most likely to have new
-        // content (based on their cached newest post), so the newest region of
-        // the feed fills in before we touch the rest. Stop as soon as the feed
-        // is full enough that the remaining users can't add anything newer.
-        val ordered = staleKeys
-            .sortedByDescending { username ->
-                cache[username.lowercase()]?.posts
-                    ?.maxOfOrNull { it.timestamp ?: 0L } ?: 0L
+        // Re-order dynamically by recency: each fetch discovers a user's real
+        // newest post time, so we re-sort whoever is still pending and pull in
+        // the users with the newest content first — regardless of the order of
+        // the following list.
+        val remaining = staleKeys.toMutableList()
+        val newestByUser = mutableMapOf<String, Long>().apply {
+            staleKeys.forEach { username ->
+                put(
+                    username.lowercase(),
+                    cache[username.lowercase()]?.posts
+                        ?.maxOfOrNull { it.timestamp ?: 0L } ?: 0L
+                )
             }
-            .take(MAX_USERS_PER_REFRESH)
-
-        val successes = AtomicInteger(0)
+        }
         val fetched = mutableMapOf<String, CachedUserPosts>()
         var rateLimited = false
+        var fetchCount = 0
 
-        for (username in ordered) {
+        while (remaining.isNotEmpty() && fetchCount < MAX_USERS_PER_REFRESH) {
+            remaining.sortByDescending { newestByUser[it.lowercase()] ?: 0L }
+            val username = remaining.removeAt(0)
             delay(STAGGER_MILLIS)
             when (val outcome = fetchPostsForUser(username)) {
                 is UserFetch.Success -> {
-                    successes.incrementAndGet()
                     val picked = pickPostsForUser(outcome.items, cutoff)
                     if (picked.isNotEmpty()) {
                         _state.update { current ->
@@ -122,8 +137,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     fetched[username.lowercase()] =
                         CachedUserPosts(now, outcome.items.map { it.post })
+                    newestByUser[username.lowercase()] =
+                        outcome.items.maxOfOrNull { it.post.timestamp ?: 0L } ?: 0L
+                    fetchCount++
 
-                    if (feedIsComplete(cache, ordered, fetched.keys, cutoff)) break
+                    if (feedIsComplete(remaining, newestByUser, cutoff)) break
                 }
                 UserFetch.RateLimited -> {
                     // Stop hammering the instance; it'll stay blocked as long as
@@ -131,20 +149,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     rateLimited = true
                     break
                 }
-                UserFetch.Failed -> Unit
+                UserFetch.Failed -> fetchCount++
             }
         }
 
         dataStore.saveUserPostsCache(cache + fetched)
         _state.value = _state.value.copy(
             isLoadingToday = false,
-            todayError = when {
-                rateLimited && successes.get() == 0 && freshKeys.isEmpty() ->
-                    "Instagram is rate-limiting the instance. Retrying in a minute..."
-                successes.get() == 0 && freshKeys.isEmpty() ->
-                    "Couldn't reach the instance. Check that it's online and on the same network."
-                else -> null
-            }
+            todayError = null
         )
 
         if (rateLimited) {
@@ -157,10 +169,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun fetchPostsForUser(username: String): UserFetch {
-        val resp = repository.getUser(username)
+        val resp = repository.getUserTimeline(username)
         if (resp is ApiResult.Success) {
             return UserFetch.Success(
-                (resp.data.grid?.items).orEmpty()
+                (resp.data.timeline?.items).orEmpty()
                     .map { HomePostItem(post = it, username = username) }
             )
         }
@@ -197,9 +209,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             ?: "post_${post.hashCode()}"
 
     private fun feedIsComplete(
-        cache: Map<String, CachedUserPosts>,
-        ordered: List<String>,
-        fetchedKeys: Set<String>,
+        remaining: List<String>,
+        newestByUser: Map<String, Long>,
         cutoff: Long
     ): Boolean {
         val recents = _state.value.todayPosts.filter {
@@ -207,9 +218,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         if (recents.size < ENOUGH_RECENT) return false
         val threshold = recents.minOf { postMillis(it.post.timestamp ?: 0L) }
-        val next = ordered.firstOrNull { it.lowercase() !in fetchedKeys } ?: return true
-        val nextNewest = cache[next.lowercase()]?.posts?.maxOfOrNull { it.timestamp ?: 0L }
-            ?: return false
+        val next = remaining.firstOrNull() ?: return true
+        val nextNewest = newestByUser[next.lowercase()] ?: return false
+        if (nextNewest <= 0L) return false
         return postMillis(nextNewest) < threshold
     }
 

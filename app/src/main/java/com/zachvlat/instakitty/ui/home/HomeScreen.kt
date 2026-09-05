@@ -264,6 +264,21 @@ private fun TodaySection(
     onPostClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (items.isEmpty() && !isLoading && error == null) {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Follow someone to see their posts here",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 32.dp)
+            )
+        }
+        return
+    }
     LazyVerticalGrid(
         modifier = modifier,
         columns = GridCells.Fixed(3),
@@ -311,17 +326,6 @@ private fun TodaySection(
                                 .padding(horizontal = 24.dp, vertical = 8.dp)
                         )
                         TextButton(onClick = onRefresh) { Text("Retry") }
-                    }
-                    items.isEmpty() -> {
-                        Text(
-                            text = "No recent posts from people you follow",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 8.dp)
-                        )
                     }
                 }
                 if (isLoading && items.isNotEmpty()) {

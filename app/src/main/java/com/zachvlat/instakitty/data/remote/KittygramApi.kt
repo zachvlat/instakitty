@@ -28,6 +28,12 @@ interface KittygramApi {
         @Query("cursor") cursor: String? = null
     ): Response<UserProfileGridResponse>
 
+    @GET("api/users/timeline/{username}")
+    suspend fun getUserTimeline(
+        @Path("username") username: String,
+        @Query("cursor") cursor: String? = null
+    ): Response<UserTimelineResponse>
+
     @GET("api/search")
     suspend fun search(@Query("query") query: String): Response<SearchResponse>
 
