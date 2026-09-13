@@ -1,6 +1,7 @@
 package com.zachvlat.instakitty.ui.home
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.zachvlat.instakitty.data.local.CachedUserPosts
@@ -90,6 +91,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { current ->
             val cached = followed.flatMap { username ->
                 cache[username.lowercase()]?.posts.orEmpty()
+                    .filter { it.timestamp != null && isRecent(it.timestamp, cutoff) }
                     .map { HomePostItem(post = it, username = username) }
             }
             current.copy(
@@ -118,7 +120,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         val fetched = mutableMapOf<String, CachedUserPosts>()
+        val retries = mutableMapOf<String, Int>()
         var rateLimited = false
+        var consecutiveRateLimited = 0
         var fetchCount = 0
 
         while (remaining.isNotEmpty() && fetchCount < MAX_USERS_PER_REFRESH) {
@@ -127,7 +131,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             delay(STAGGER_MILLIS)
             when (val outcome = fetchPostsForUser(username)) {
                 is UserFetch.Success -> {
+                    consecutiveRateLimited = 0
                     val picked = pickPostsForUser(outcome.items, cutoff)
+                    newestByUser[username.lowercase()] =
+                        outcome.items.maxOfOrNull { it.post.timestamp ?: 0L } ?: 0L
+                    Log.d(
+                        TAG, "Fetched [$username] ${outcome.items.size} items, " +
+                            "picked ${picked.size}, newest=${fmtTs(outcome.items.maxOfOrNull { it.post.timestamp ?: 0L })}"
+                    )
                     if (picked.isNotEmpty()) {
                         _state.update { current ->
                             current.copy(
@@ -137,26 +148,61 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     fetched[username.lowercase()] =
                         CachedUserPosts(now, outcome.items.map { it.post })
-                    newestByUser[username.lowercase()] =
-                        outcome.items.maxOfOrNull { it.post.timestamp ?: 0L } ?: 0L
                     fetchCount++
 
-                    if (feedIsComplete(remaining, newestByUser, cutoff)) break
+                    if (feedIsComplete(remaining, newestByUser, cutoff)) {
+                        Log.d(TAG, "Feed complete after [$username] (${_state.value.todayPosts.size} posts)")
+                        break
+                    }
                 }
                 UserFetch.RateLimited -> {
-                    // Stop hammering the instance; it'll stay blocked as long as
-                    // we keep firing requests. Retry later with a single poke.
+                    // A single rate-limited user shouldn't abort the whole
+                    // refresh — skip it and keep trying the others in case the
+                    // block is account-specific. Only stop once several users
+                    // in a row were blocked (a real instance-wide block), so we
+                    // don't keep hammering a blocked instance.
                     rateLimited = true
-                    break
+                    consecutiveRateLimited++
+                    fetchCount++
+                    if (consecutiveRateLimited >= MAX_CONSECUTIVE_RATE_LIMITED) {
+                        Log.d(
+                            TAG, "Instance rate-limited on $consecutiveRateLimited consecutive users; stopping"
+                        )
+                        break
+                    }
                 }
-                UserFetch.Failed -> fetchCount++
+                UserFetch.Failed -> {
+                    // The instance's timeline endpoint is flaky (transient 500s);
+                    // a failed user often succeeds on a retry seconds later.
+                    val attempt = (retries[username] ?: 0) + 1
+                    if (attempt <= MAX_TIMELINE_RETRIES) {
+                        retries[username] = attempt
+                        remaining.add(username)
+                        Log.d(TAG, "Timeline [$username] failed (retry $attempt/$MAX_TIMELINE_RETRIES)")
+                    } else {
+                        fetchCount++
+                    }
+                }
             }
+        }
+
+        Log.d(TAG, "Feed order (top 20):")
+        _state.value.todayPosts.take(20).forEachIndexed { i, item ->
+            Log.d(
+                TAG, "  ${i + 1}. @${item.username} /${item.post.shortcode} " +
+                    "timestamp=${item.post.timestamp} (${fmtTs(item.post.timestamp)})"
+            )
         }
 
         dataStore.saveUserPostsCache(cache + fetched)
         _state.value = _state.value.copy(
             isLoadingToday = false,
-            todayError = null
+            todayError = if (rateLimited) {
+                "Instagram has temporarily blocked requests from your kittygram " +
+                    "server. Retrying automatically in a minute."
+            } else {
+                null
+            }
         )
 
         if (rateLimited) {
@@ -188,9 +234,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             error.message.contains("rate", ignoreCase = true)
 
     private fun pickPostsForUser(posts: List<HomePostItem>, cutoff: Long): List<HomePostItem> {
-        val recent = posts.filter { it.post.timestamp != null && isRecent(it.post.timestamp, cutoff) }
-        val older = posts.filterNot { it in recent }
-        return (recent + older)
+        return posts
+            .filter { it.post.timestamp != null && isRecent(it.post.timestamp, cutoff) }
             .distinctBy { postKey(it.post) }
             .take(USER_FILL_TARGET)
     }
@@ -230,14 +275,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private fun isRecent(timestamp: Long, cutoff: Long): Boolean =
         postMillis(timestamp) >= cutoff
 
+    private fun fmtTs(timestamp: Long?): String {
+        if (timestamp == null || timestamp <= 0L) return "none"
+        val millis = postMillis(timestamp)
+        return java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+            .format(java.util.Date(millis))
+    }
+
     companion object {
+        private const val TAG = "InstaKitty.Home"
         private const val DAY_MILLIS = 24L * 60 * 60 * 1000
-        private const val RECENT_DAYS = 7
+        private const val RECENT_DAYS = 30
         private const val USER_FILL_TARGET = 3
         private const val CACHE_TTL_MILLIS = 60L * 60 * 1000
         private const val STAGGER_MILLIS = 400L
         private const val ENOUGH_RECENT = 24
         private const val MAX_USERS_PER_REFRESH = 12
+        private const val MAX_TIMELINE_RETRIES = 2
+        private const val MAX_CONSECUTIVE_RATE_LIMITED = 3
         private const val RETRY_DELAY_MILLIS = 60_000L
     }
 
