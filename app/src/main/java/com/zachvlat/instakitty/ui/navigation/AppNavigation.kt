@@ -131,6 +131,9 @@ fun AppNavigation(dataStore: SettingsDataStore, deepLinkRoute: String? = null) {
                 ExploreScreen(
                     onPostClick = { shortcode ->
                         navController.navigate("post/$shortcode")
+                    },
+                    onUserClick = { username ->
+                        navController.navigate("user/$username")
                     }
                 )
             }

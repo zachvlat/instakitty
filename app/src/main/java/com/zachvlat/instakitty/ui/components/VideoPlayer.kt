@@ -3,7 +3,6 @@ package com.zachvlat.instakitty.ui.components
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -57,61 +56,53 @@ fun VideoPlayer(
         }
     }
 
-    val playerView = remember {
-        PlayerView(context).apply {
-            this.player = player
-            useController = true
-            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-        }
+    DisposableEffect(Unit) {
+        onDispose { player.release() }
     }
 
-    DisposableEffect(Unit) {
-        onDispose {
-            playerView.player = null
-            player.release()
-        }
+    fun newPlayerView(): PlayerView = PlayerView(context).apply {
+        this.player = player
+        useController = true
+        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
     }
 
     Box(modifier = modifier) {
         if (isFullscreen) {
-            val exitFullscreen = {
-                (playerView.parent as? ViewGroup)?.removeView(playerView)
-                isFullscreen = false
+            val activity = LocalContext.current.findActivity()
+            DisposableEffect(activity) {
+                val controller = activity?.let {
+                    WindowInsetsControllerCompat(it.window, it.window.decorView)
+                }
+                controller?.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller?.hide(WindowInsetsCompat.Type.systemBars())
+                onDispose {
+                    controller?.show(WindowInsetsCompat.Type.systemBars())
+                }
             }
             Dialog(
-                onDismissRequest = exitFullscreen,
+                onDismissRequest = { isFullscreen = false },
                 properties = DialogProperties(usePlatformDefaultWidth = false)
             ) {
-                val activity = LocalContext.current.findActivity()
-                DisposableEffect(activity) {
-                    val controller = activity?.let {
-                        WindowInsetsControllerCompat(it.window, it.window.decorView)
-                    }
-                    controller?.systemBarsBehavior =
-                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                    controller?.hide(WindowInsetsCompat.Type.systemBars())
-                    onDispose {
-                        controller?.show(WindowInsetsCompat.Type.systemBars())
-                    }
-                }
-
                 Box(modifier = Modifier.fillMaxSize()) {
                     AndroidView(
-                        factory = { playerView },
-                        modifier = Modifier.fillMaxSize()
+                        factory = { newPlayerView() },
+                        modifier = Modifier.fillMaxSize(),
+                        onRelease = { it.player = null }
                     )
                     MediaFullscreenButton(
                         icon = Icons.Filled.FullscreenExit,
                         contentDescription = "Exit fullscreen",
-                        onClick = exitFullscreen,
+                        onClick = { isFullscreen = false },
                         modifier = Modifier.align(Alignment.TopEnd)
                     )
                 }
             }
         } else {
             AndroidView(
-                factory = { playerView },
-                modifier = Modifier.fillMaxSize()
+                factory = { newPlayerView() },
+                modifier = Modifier.fillMaxSize(),
+                onRelease = { it.player = null }
             )
             if (showFullscreenButton) {
                 MediaFullscreenButton(

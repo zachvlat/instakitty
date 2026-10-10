@@ -3,6 +3,7 @@ package com.zachvlat.instakitty.data.local
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -32,6 +33,7 @@ class SettingsDataStore(private val context: Context) {
         private val FAVORITE_QUERIES = stringPreferencesKey("favorite_queries")
         private val SAVED_POSTS = stringPreferencesKey("saved_posts")
         private val USER_POSTS_CACHE = stringPreferencesKey("user_posts_cache")
+        private val USE_THIRD_PARTY_APIS = booleanPreferencesKey("use_third_party_apis")
     }
 
     val instanceUrl: Flow<String> = context.dataStore.data.map { prefs ->
@@ -44,6 +46,10 @@ class SettingsDataStore(private val context: Context) {
 
     val isConfigured: Flow<Boolean> = context.dataStore.data.map { prefs ->
         !prefs[INSTANCE_URL].isNullOrBlank()
+    }
+
+    val useThirdPartyApis: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[USE_THIRD_PARTY_APIS] ?: false
     }
 
     val followedUsers: Flow<Set<String>> = context.dataStore.data.map { prefs ->
@@ -122,6 +128,12 @@ class SettingsDataStore(private val context: Context) {
         context.dataStore.edit { prefs ->
             prefs[INSTANCE_URL] = url.trimEnd('/')
             prefs[API_TOKEN] = token.trim()
+        }
+    }
+
+    suspend fun setThirdPartyApis(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[USE_THIRD_PARTY_APIS] = enabled
         }
     }
 

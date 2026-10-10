@@ -18,6 +18,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -26,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 
 @Composable
 fun FollowingScreen(
@@ -114,18 +117,30 @@ fun FollowingScreen(
                                     modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Surface(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape),
-                                        color = MaterialTheme.colorScheme.surfaceVariant
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = Icons.Filled.Person,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
+                                    val avatar = state.avatars[username]
+                                    if (avatar != null) {
+                                        AsyncImage(
+                                            model = avatar,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(CircleShape),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        Surface(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(CircleShape),
+                                            color = MaterialTheme.colorScheme.surfaceVariant
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Person,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
                                         }
                                     }
                                     Spacer(Modifier.width(12.dp))

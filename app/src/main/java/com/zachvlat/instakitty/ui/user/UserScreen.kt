@@ -1,12 +1,15 @@
 package com.zachvlat.instakitty.ui.user
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items as lazyRowItems
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -22,7 +25,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.zachvlat.instakitty.data.remote.InstaHighlight
 import com.zachvlat.instakitty.data.remote.Post
+import com.zachvlat.instakitty.ui.components.StoryViewer
 
 @Composable
 fun UserScreen(
@@ -93,6 +98,8 @@ fun UserScreen(
                                 UserHeader(
                                     user = user,
                                     isFollowing = state.isFollowing,
+                                    hasStories = state.stories.isNotEmpty(),
+                                    onAvatarClick = { viewModel.openStories() },
                                     onToggleFollow = { viewModel.toggleFollow() }
                                 )
                             }
@@ -100,6 +107,14 @@ fun UserScreen(
                         item(span = { GridItemSpan(3) }) {
                             if (state.posts.isNotEmpty()) {
                                 HorizontalDivider()
+                            }
+                        }
+                        if (state.highlights.isNotEmpty()) {
+                            item(span = { GridItemSpan(3) }) {
+                                HighlightsSection(
+                                    highlights = state.highlights,
+                                    onHighlightClick = { viewModel.openHighlight(it) }
+                                )
                             }
                         }
                         val posts = state.posts
@@ -125,12 +140,22 @@ fun UserScreen(
             }
         }
     }
+
+    state.viewer?.let { viewer ->
+        StoryViewer(
+            stories = viewer.stories,
+            title = viewer.title,
+            onDismiss = { viewModel.closeViewer() }
+        )
+    }
 }
 
 @Composable
 private fun UserHeader(
     user: com.zachvlat.instakitty.data.remote.User,
     isFollowing: Boolean,
+    hasStories: Boolean,
+    onAvatarClick: () -> Unit,
     onToggleFollow: () -> Unit
 ) {
     Column(
@@ -138,24 +163,49 @@ private fun UserHeader(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             val pp = user.profilePicture ?: user.profilePicUrl
-            if (pp != null) {
-                AsyncImage(
-                    model = pp,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            }
-            Spacer(Modifier.width(24.dp))
-            Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.SpaceEvenly
+            Box(
+                modifier = Modifier
+                    .size(88.dp)
+                    .then(
+                        if (hasStories) {
+                            Modifier.border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .clickable(enabled = hasStories, onClick = onAvatarClick),
+                contentAlignment = Alignment.Center
             ) {
-                StatItem("Posts", user.mediaCount ?: 0)
-                StatItem("Followers", user.followerCount ?: 0)
-                StatItem("Following", user.followingCount ?: 0)
+                if (pp != null) {
+                    AsyncImage(
+                        model = pp,
+                        contentDescription = if (hasStories) "View stories" else null,
+                        modifier = Modifier
+                            .size(74.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Surface(
+                        modifier = Modifier.size(74.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {}
+                }
+            }
+            Spacer(Modifier.width(16.dp))
+            val mediaCount = user.mediaCount
+            val followerCount = user.followerCount
+            val followingCount = user.followingCount
+            if (mediaCount != null || followerCount != null || followingCount != null) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    mediaCount?.let { StatItem("Posts", it) }
+                    followerCount?.let { StatItem("Followers", it) }
+                    followingCount?.let { StatItem("Following", it) }
+                }
             }
         }
 
@@ -195,8 +245,60 @@ private fun UserHeader(
 }
 
 @Composable
-private fun StatItem(label: String, count: Int) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun HighlightsSection(
+    highlights: List<InstaHighlight>,
+    onHighlightClick: (InstaHighlight) -> Unit
+) {
+    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+        Text(
+            text = "Highlights",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        Spacer(Modifier.height(8.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            lazyRowItems(highlights, key = { it.id ?: it.title ?: it.hashCode() }) { highlight ->
+                Column(
+                    modifier = Modifier
+                        .width(76.dp)
+                        .clickable { onHighlightClick(highlight) },
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (highlight.coverUrl != null) {
+                        AsyncImage(
+                            model = highlight.coverUrl,
+                            contentDescription = highlight.title,
+                            modifier = Modifier
+                                .size(68.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Surface(
+                            modifier = Modifier.size(68.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {}
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = highlight.title ?: "",
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatItem(label: String, count: Int) {    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = formatUserCount(count),
             fontWeight = FontWeight.Bold,

@@ -7,9 +7,11 @@ import com.zachvlat.instakitty.data.local.SettingsDataStore
 import com.zachvlat.instakitty.data.remote.ApiResult
 import com.zachvlat.instakitty.data.remote.ExploreItem
 import com.zachvlat.instakitty.data.remote.KittygramRepository
+import com.zachvlat.instakitty.data.remote.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 data class ExploreUiState(
@@ -20,7 +22,8 @@ data class ExploreUiState(
     val isLoadingMore: Boolean = false,
     val error: String? = null,
     val endCursor: String? = null,
-    val favoriteQueries: List<String> = emptyList()
+    val favoriteQueries: List<String> = emptyList(),
+    val relatedProfiles: List<User> = emptyList()
 )
 
 class ExploreViewModel(application: Application) : AndroidViewModel(application) {
@@ -35,6 +38,24 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             dataStore.favoriteQueries.collect { favorites ->
                 _state.value = _state.value.copy(favoriteQueries = favorites)
+            }
+        }
+        viewModelScope.launch {
+            combine(dataStore.useThirdPartyApis, dataStore.followedUsers) { thirdPartyEnabled, followed ->
+                if (thirdPartyEnabled) followed.firstOrNull() else null
+            }.collect { seed ->
+                if (seed == null) {
+                    _state.value = _state.value.copy(relatedProfiles = emptyList())
+                    return@collect
+                }
+                when (val result = repository.getRelatedProfiles(seed)) {
+                    is ApiResult.Success -> {
+                        _state.value = _state.value.copy(relatedProfiles = result.data)
+                    }
+                    else -> {
+                        _state.value = _state.value.copy(relatedProfiles = emptyList())
+                    }
+                }
             }
         }
     }

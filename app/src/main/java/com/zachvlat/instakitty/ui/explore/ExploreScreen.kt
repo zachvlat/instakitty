@@ -23,10 +23,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -36,6 +38,7 @@ import com.zachvlat.instakitty.data.remote.ExploreItem
 @Composable
 fun ExploreScreen(
     onPostClick: (String) -> Unit,
+    onUserClick: (String) -> Unit,
     viewModel: ExploreViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -60,6 +63,51 @@ fun ExploreScreen(
         )
 
         Spacer(Modifier.height(8.dp))
+
+        if (state.relatedProfiles.isNotEmpty()) {
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(state.relatedProfiles.size, key = { index -> state.relatedProfiles[index].username ?: "related_$index" }) { index ->
+                    val profile = state.relatedProfiles[index]
+                    Column(
+                        modifier = Modifier
+                            .width(76.dp)
+                            .clickable { profile.username?.let(onUserClick) },
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        val pic = profile.profilePicture ?: profile.profilePicUrl
+                        if (pic != null) {
+                            AsyncImage(
+                                model = pic,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(68.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Surface(
+                                modifier = Modifier.size(68.dp),
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            ) {}
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = profile.username ?: "",
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
 
         Row(
             modifier = Modifier

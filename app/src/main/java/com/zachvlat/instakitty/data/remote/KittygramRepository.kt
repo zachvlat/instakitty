@@ -12,6 +12,10 @@ class KittygramRepository(private val dataStore: SettingsDataStore) {
 
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
+    private val thirdPartyApi: InstapeekaApi by lazy { RetrofitClient.createThirdParty() }
+
+    private suspend fun thirdPartyEnabled(): Boolean = dataStore.useThirdPartyApis.first()
+
     private suspend fun getClient(): KittygramApi? {
         val url = dataStore.instanceUrl.first()
         val token = dataStore.apiToken.first()
@@ -171,55 +175,163 @@ class KittygramRepository(private val dataStore: SettingsDataStore) {
         }
     }
 
+    // Profile pages always come from Kittygram first so pagination, counts and bio are
+    // complete. instapeeka only serves the first page (no cursor), so it is used as a
+    // best-effort fallback when the configured instance is missing or fails.
     suspend fun getUser(username: String, cursor: String? = null): ApiResult<UserProfileGridResponse> {
+        val result = kittygramUser(username, cursor)
+        if (result is ApiResult.Success) return result
+        if (cursor == null && thirdPartyEnabled()) {
+            getThirdPartyProfile(username)?.let { return ApiResult.Success(it) }
+        }
+        return result
+    }
+
+    private suspend fun kittygramUser(
+        username: String,
+        cursor: String?
+    ): ApiResult<UserProfileGridResponse> {
         val client = getClient() ?: return ApiResult.NetworkError("No instance configured")
         return try {
             val res = client.getUser(username, cursor)
-            if (res.isSuccessful) {
-                val body = res.body()
-                if (body != null) {
-                    if (body.hasErrors == true) {
-                        ApiResult.Error(
-                            body.errorType ?: "unknown",
-                            body.errorInfo?.message ?: "Unknown error"
-                        )
-                    } else {
-                        ApiResult.Success(body)
-                    }
-                } else {
-                    ApiResult.NetworkError("Empty response")
-                }
-            } else {
-                ApiResult.Error("http_${res.code()}", res.message())
+            val body = res.body()
+            when {
+                !res.isSuccessful -> ApiResult.Error("http_${res.code()}", res.message())
+                body == null -> ApiResult.NetworkError("Empty response")
+                body.hasErrors == true -> ApiResult.Error(
+                    body.errorType ?: "unknown",
+                    body.errorInfo?.message ?: "Unknown error"
+                )
+                else -> ApiResult.Success(body)
             }
         } catch (e: Exception) {
             ApiResult.NetworkError(e.message ?: "Network error")
         }
     }
 
+    // The heavy per-user "today" feed fetch offloads to instapeeka when enabled, but
+    // still works against Kittygram (with or without the third-party API).
     suspend fun getUserTimeline(username: String, cursor: String? = null): ApiResult<UserTimelineResponse> {
+        if (thirdPartyEnabled()) {
+            getThirdPartyTimeline(username)?.let { return ApiResult.Success(it) }
+        }
+        return kittygramTimeline(username, cursor)
+    }
+
+    private suspend fun kittygramTimeline(
+        username: String,
+        cursor: String?
+    ): ApiResult<UserTimelineResponse> {
         val client = getClient() ?: return ApiResult.NetworkError("No instance configured")
         return try {
             val res = client.getUserTimeline(username, cursor)
+            val body = res.body()
+            when {
+                !res.isSuccessful -> ApiResult.Error("http_${res.code()}", res.message())
+                body == null -> ApiResult.NetworkError("Empty response")
+                body.hasErrors == true -> ApiResult.Error(
+                    body.errorType ?: "unknown",
+                    body.errorInfo?.message ?: "Unknown error"
+                )
+                else -> ApiResult.Success(body)
+            }
+        } catch (e: Exception) {
+            ApiResult.NetworkError(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun getProfileAvatar(username: String): String? {
+        if (!thirdPartyEnabled()) return null
+        return try {
+            val res = thirdPartyApi.getProfile(username)
+            if (res.isSuccessful) res.body()?.profile?.profilePictureUrl else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    suspend fun getRelatedProfiles(username: String): ApiResult<List<User>> {
+        if (!thirdPartyEnabled()) return ApiResult.Success(emptyList())
+        return try {
+            val res = thirdPartyApi.getRelated(username)
             if (res.isSuccessful) {
-                val body = res.body()
-                if (body != null) {
-                    if (body.hasErrors == true) {
-                        ApiResult.Error(
-                            body.errorType ?: "unknown",
-                            body.errorInfo?.message ?: "Unknown error"
-                        )
-                    } else {
-                        ApiResult.Success(body)
-                    }
-                } else {
-                    ApiResult.NetworkError("Empty response")
-                }
+                ApiResult.Success(res.body()?.profiles.orEmpty().map { it.toUser() })
             } else {
                 ApiResult.Error("http_${res.code()}", res.message())
             }
         } catch (e: Exception) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            ApiResult.NetworkError(e.message ?: "Related profiles failed")
+        }
+    }
+
+    suspend fun getHighlights(username: String): ApiResult<List<InstaHighlight>> {
+        if (!thirdPartyEnabled()) return ApiResult.Success(emptyList())
+        return try {
+            val res = thirdPartyApi.getHighlights(username)
+            if (res.isSuccessful) {
+                ApiResult.Success(res.body()?.highlights.orEmpty())
+            } else {
+                ApiResult.Error("http_${res.code()}", res.message())
+            }
+        } catch (e: Exception) {
+            ApiResult.NetworkError(e.message ?: "Highlights failed")
+        }
+    }
+
+    suspend fun getStories(username: String): ApiResult<List<InstaStory>> {
+        if (!thirdPartyEnabled()) return ApiResult.Success(emptyList())
+        return try {
+            val res = thirdPartyApi.getProfile(username)
+            if (res.isSuccessful) {
+                ApiResult.Success(res.body()?.stories.orEmpty())
+            } else {
+                ApiResult.Error("http_${res.code()}", res.message())
+            }
+        } catch (e: Exception) {
+            ApiResult.NetworkError(e.message ?: "Stories failed")
+        }
+    }
+
+    suspend fun getHighlightItems(highlightId: String, username: String): ApiResult<List<InstaStory>> {
+        if (!thirdPartyEnabled()) return ApiResult.Success(emptyList())
+        return try {
+            val res = thirdPartyApi.getHighlightItems(highlightId, username)
+            if (res.isSuccessful) {
+                ApiResult.Success(res.body()?.stories.orEmpty())
+            } else {
+                ApiResult.Error("http_${res.code()}", res.message())
+            }
+        } catch (e: Exception) {
+            ApiResult.NetworkError(e.message ?: "Highlight items failed")
+        }
+    }
+
+    // instapeeka's profile has no counts/bio; this is only a fallback for page one.
+    private suspend fun getThirdPartyProfile(username: String): UserProfileGridResponse? {
+        return try {
+            val profileRes = thirdPartyApi.getProfile(username)
+            if (!profileRes.isSuccessful) return null
+            val profile = profileRes.body()?.profile ?: return null
+            val postsRes = thirdPartyApi.getPosts(username)
+            if (!postsRes.isSuccessful) return null
+            UserProfileGridResponse(
+                info = profile.toUser(),
+                grid = GridData(items = postsRes.body()?.posts.orEmpty().map { it.toPost() })
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private suspend fun getThirdPartyTimeline(username: String): UserTimelineResponse? {
+        return try {
+            val res = thirdPartyApi.getPosts(username)
+            if (!res.isSuccessful) return null
+            UserTimelineResponse(
+                timeline = GridData(items = res.body()?.posts.orEmpty().map { it.toPost() })
+            )
+        } catch (_: Exception) {
+            null
         }
     }
 }

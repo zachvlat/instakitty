@@ -35,8 +35,9 @@ import coil.compose.AsyncImage
 import com.zachvlat.instakitty.R
 import com.zachvlat.instakitty.data.remote.User
 
-private val Calligraphy = FontFamily(
-    Font(R.font.great_vibes, FontWeight.Normal)
+private val Oswald = FontFamily(
+    Font(R.font.oswald_semibold, FontWeight.SemiBold),
+    Font(R.font.oswald_bold, FontWeight.Bold)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,7 +58,8 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp, bottom = 4.dp),
-                fontFamily = Calligraphy,
+                fontFamily = Oswald,
+                fontWeight = FontWeight.SemiBold,
                 fontSize = 34.sp,
                 color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center

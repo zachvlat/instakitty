@@ -103,6 +103,41 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
+                        text = "Third-Party APIs",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Offload heavy fetches (following-page avatars, home feed) " +
+                            "and enable stories, highlights and related profiles via " +
+                            "instapeeka.com. Profiles and posts still come from your Kittygram " +
+                            "instance; instapeeka is only used as a fallback.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(
+                    checked = state.useThirdPartyApis,
+                    onCheckedChange = viewModel::setThirdPartyApis
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
                         text = "Deep Links",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Medium
@@ -139,7 +174,7 @@ fun SettingsScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "InstaKitty v1.6.4",
+                    text = "InstaKitty v1.7.4",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

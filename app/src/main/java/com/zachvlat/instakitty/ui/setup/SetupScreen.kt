@@ -10,6 +10,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -17,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.zachvlat.instakitty.R
 
 @Composable
 fun SetupScreen(
@@ -44,7 +47,10 @@ fun SetupScreen(
             Text(
                 text = "InstaKitty",
                 fontSize = 32.sp,
-                fontWeight = FontWeight.Bold
+                fontFamily = FontFamily(
+                    Font(R.font.oswald_semibold, FontWeight.SemiBold)
+                ),
+                fontWeight = FontWeight.SemiBold
             )
             Spacer(Modifier.height(8.dp))
             Text(

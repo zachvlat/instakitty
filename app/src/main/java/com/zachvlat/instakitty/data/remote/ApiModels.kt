@@ -1,5 +1,6 @@
 package com.zachvlat.instakitty.data.remote
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -9,6 +10,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonNames
 
 @Serializable
 data class ExploreItem(
@@ -62,6 +64,9 @@ data class ApiInfo(
     @SerialName("atom_enabled") val atomEnabled: Boolean = false
 )
 
+// Kittygram's /api/users/grid|timeline "info" object exposes "followers"/"following"
+// instead of the old /api/user/ names ("follower_count"/"following_count").
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class User(
     val username: String? = null,
@@ -70,8 +75,8 @@ data class User(
     @SerialName("profile_picture") val profilePicture: String? = null,
     @SerialName("profile_pic_url") val profilePicUrl: String? = null,
     @SerialName("is_verified") val isVerified: Boolean? = null,
-    @SerialName("follower_count") val followerCount: Int? = null,
-    @SerialName("following_count") val followingCount: Int? = null,
+    @SerialName("follower_count") @JsonNames("followers") val followerCount: Int? = null,
+    @SerialName("following_count") @JsonNames("following") val followingCount: Int? = null,
     @SerialName("media_count") val mediaCount: Int? = null,
     val biography: String? = null,
     @SerialName("is_private") val isPrivate: Boolean? = null,
