@@ -138,7 +138,7 @@ fun ExploreScreen(
         }
 
         val currentTopic = state.currentTopic
-        if (currentTopic != null) {
+        if (currentTopic != null && currentTopic !in state.favoriteQueries) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

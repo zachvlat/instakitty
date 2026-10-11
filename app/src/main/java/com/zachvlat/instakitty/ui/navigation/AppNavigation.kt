@@ -37,7 +37,11 @@ enum class BottomTab(val label: String, val route: String, val icon: ImageVector
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppNavigation(dataStore: SettingsDataStore, deepLinkRoute: String? = null) {
+fun AppNavigation(
+    dataStore: SettingsDataStore,
+    deepLinkRoute: String? = null,
+    onDeepLinkHandled: () -> Unit = {}
+) {
     val navController = rememberNavController()
     val isConfigured by dataStore.isConfigured.collectAsState(initial = null)
 
@@ -58,7 +62,11 @@ fun AppNavigation(dataStore: SettingsDataStore, deepLinkRoute: String? = null) {
 
     var selectedTab by remember { mutableStateOf(BottomTab.Home) }
 
-    LaunchedEffect(deepLinkRoute) {
+    LaunchedEffect(deepLinkRoute, startDestination) {
+        android.util.Log.d(
+            "InstaKitty.DeepLink",
+            "AppNavigation deepLinkRoute=$deepLinkRoute startDestination=$startDestination"
+        )
         if (deepLinkRoute != null && startDestination == "home") {
             navController.navigate(deepLinkRoute) {
                 popUpTo(navController.graph.startDestinationId) {
@@ -71,6 +79,7 @@ fun AppNavigation(dataStore: SettingsDataStore, deepLinkRoute: String? = null) {
                 deepLinkRoute.startsWith("post/") -> BottomTab.Following
                 else -> BottomTab.Home
             }
+            onDeepLinkHandled()
         }
     }
 
