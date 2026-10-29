@@ -2,6 +2,7 @@ package com.zachvlat.instakitty.ui.explore
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -34,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.zachvlat.instakitty.data.remote.ExploreItem
+import com.zachvlat.instakitty.data.remote.User
+import com.zachvlat.instakitty.util.InstagramLinkParser
 
 @Composable
 fun ExploreScreen(
@@ -51,6 +54,23 @@ fun ExploreScreen(
         }
     }
 
+    // Accounts mode accepts pasted post/profile links and plain usernames, opening the top
+    // match (or the typed name) directly; hashtags mode searches the topic.
+    val onSubmit: () -> Unit = submit@{
+        if (state.searchMode == SearchMode.Hashtags) {
+            viewModel.search()
+            return@submit
+        }
+        val query = state.searchQuery.trim()
+        val route = InstagramLinkParser.routeFromUrl(query)
+        when {
+            route != null && route.startsWith("post/") -> onPostClick(route.removePrefix("post/"))
+            route != null && route.startsWith("user/") -> onUserClick(route.removePrefix("user/"))
+            state.userResults.isNotEmpty() -> state.userResults.first().username?.let(onUserClick)
+            else -> query.removePrefix("@").trim('/').ifBlank { null }?.let(onUserClick)
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
             text = "Explore",
@@ -64,51 +84,6 @@ fun ExploreScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        if (state.relatedProfiles.isNotEmpty()) {
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(state.relatedProfiles.size, key = { index -> state.relatedProfiles[index].username ?: "related_$index" }) { index ->
-                    val profile = state.relatedProfiles[index]
-                    Column(
-                        modifier = Modifier
-                            .width(76.dp)
-                            .clickable { profile.username?.let(onUserClick) },
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        val pic = profile.profilePicture ?: profile.profilePicUrl
-                        if (pic != null) {
-                            AsyncImage(
-                                model = pic,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(68.dp)
-                                    .clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Surface(
-                                modifier = Modifier.size(68.dp),
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surfaceVariant
-                            ) {}
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = profile.username ?: "",
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-        }
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -119,10 +94,15 @@ fun ExploreScreen(
                 value = state.searchQuery,
                 onValueChange = viewModel::onSearchQueryChange,
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Search a topic...") },
+                placeholder = {
+                    Text(
+                        if (state.searchMode == SearchMode.Hashtags) "Search a hashtag..."
+                        else "Username or Instagram link..."
+                    )
+                },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { viewModel.search() }),
+                keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
                 trailingIcon = {
                     if (state.searchQuery.isNotEmpty()) {
                         IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
@@ -132,9 +112,36 @@ fun ExploreScreen(
                 }
             )
             Spacer(Modifier.width(8.dp))
-            FilledIconButton(onClick = { viewModel.search() }) {
+            FilledIconButton(onClick = { onSubmit() }) {
                 Icon(Icons.Filled.Search, contentDescription = "Search")
             }
+        }
+
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            SearchMode.entries.forEachIndexed { index, mode ->
+                SegmentedButton(
+                    selected = state.searchMode == mode,
+                    onClick = { viewModel.onSearchModeChange(mode) },
+                    shape = SegmentedButtonDefaults.itemShape(index, SearchMode.entries.size),
+                    icon = {},
+                    label = { Text(mode.name) }
+                )
+            }
+        }
+
+        if (state.searchMode == SearchMode.Accounts) {
+            UserResults(
+                query = state.searchQuery,
+                isSearching = state.isSearchingUsers,
+                error = state.userSearchError,
+                results = state.userResults,
+                onUserClick = onUserClick
+            )
+            return@Column
         }
 
         val currentTopic = state.currentTopic
@@ -265,6 +272,102 @@ fun ExploreScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UserResults(
+    query: String,
+    isSearching: Boolean,
+    error: String?,
+    results: List<User>,
+    onUserClick: (String) -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            isSearching -> {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+            results.isNotEmpty() -> {
+                LazyColumn(contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)) {
+                    items(results, key = { it.username ?: it.id ?: it.hashCode() }) { user ->
+                        UserResultItem(
+                            user = user,
+                            onClick = { user.username?.let(onUserClick) }
+                        )
+                    }
+                }
+            }
+            else -> {
+                Text(
+                    text = when {
+                        error != null -> error
+                        query.trim().removePrefix("@").length < 3 -> "Type at least 3 characters to search accounts"
+                        else -> "No users found"
+                    },
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(24.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UserResultItem(
+    user: User,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val pp = user.profilePicture ?: user.profilePicUrl
+        if (pp != null) {
+            AsyncImage(
+                model = pp,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = user.username?.firstOrNull()?.uppercase() ?: "?",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(
+                text = user.username ?: "unknown",
+                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            if (!user.displayName.isNullOrBlank()) {
+                Text(
+                    text = user.displayName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

@@ -120,7 +120,7 @@ fun FollowingScreen(
                                     val avatar = state.avatars[username]
                                     if (avatar != null) {
                                         AsyncImage(
-                                            model = avatar,
+                                            model = java.io.File(avatar),
                                             contentDescription = null,
                                             modifier = Modifier
                                                 .size(40.dp)

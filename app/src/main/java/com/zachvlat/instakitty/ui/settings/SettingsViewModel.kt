@@ -15,8 +15,7 @@ data class SettingsUiState(
     val currentUrl: String = "",
     val currentToken: String = "",
     val status: String = "",
-    val isTesting: Boolean = false,
-    val useThirdPartyApis: Boolean = false
+    val isTesting: Boolean = false
 )
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -33,21 +32,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             val token = dataStore.apiToken.first()
             _state.value = _state.value.copy(currentUrl = url, currentToken = token)
         }
-        viewModelScope.launch {
-            dataStore.useThirdPartyApis.collect { enabled ->
-                _state.value = _state.value.copy(useThirdPartyApis = enabled)
-            }
-        }
     }
 
     fun resetDialogState() {
         _state.value = _state.value.copy(status = "", isTesting = false)
-    }
-
-    fun setThirdPartyApis(enabled: Boolean) {
-        viewModelScope.launch {
-            dataStore.setThirdPartyApis(enabled)
-        }
     }
 
     fun testAndSave(url: String, token: String, onResult: (Boolean, String) -> Unit) {

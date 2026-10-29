@@ -9,7 +9,6 @@ import com.zachvlat.instakitty.data.local.SettingsDataStore
 import com.zachvlat.instakitty.data.remote.ApiResult
 import com.zachvlat.instakitty.data.remote.KittygramRepository
 import com.zachvlat.instakitty.data.remote.Post
-import com.zachvlat.instakitty.data.remote.User
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,10 +30,6 @@ private sealed interface UserFetch {
 }
 
 data class HomeUiState(
-    val searchQuery: String = "",
-    val searchResults: List<User> = emptyList(),
-    val isSearching: Boolean = false,
-    val searchError: String? = null,
     val todayPosts: List<HomePostItem> = emptyList(),
     val isLoadingToday: Boolean = false,
     val todayError: String? = null
@@ -48,7 +43,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _state = MutableStateFlow(HomeUiState())
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
-    private var searchJob: Job? = null
     private var retryJob: Job? = null
     private var refreshJob: Job? = null
 
@@ -294,59 +288,5 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         private const val MAX_TIMELINE_RETRIES = 2
         private const val MAX_CONSECUTIVE_RATE_LIMITED = 3
         private const val RETRY_DELAY_MILLIS = 60_000L
-    }
-
-    fun onSearchQueryChange(query: String) {
-        _state.value = _state.value.copy(searchQuery = query)
-        searchJob?.cancel()
-        if (query.length >= 3) {
-            searchJob = viewModelScope.launch {
-                delay(300)
-                performSearch(query)
-            }
-        } else {
-            _state.value = _state.value.copy(
-                searchResults = emptyList(),
-                isSearching = false,
-                searchError = null
-            )
-        }
-    }
-
-    private suspend fun performSearch(query: String) {
-        _state.value = _state.value.copy(isSearching = true, searchError = null)
-        when (val result = repository.searchUsers(query)) {
-            is ApiResult.Success -> {
-                _state.value = _state.value.copy(
-                    searchResults = result.data,
-                    isSearching = false,
-                    searchError = if (result.data.isEmpty()) "No users found" else null
-                )
-            }
-            is ApiResult.Error -> {
-                _state.value = _state.value.copy(
-                    searchResults = emptyList(),
-                    isSearching = false,
-                    searchError = result.message
-                )
-            }
-            is ApiResult.NetworkError -> {
-                _state.value = _state.value.copy(
-                    searchResults = emptyList(),
-                    isSearching = false,
-                    searchError = result.message
-                )
-            }
-        }
-    }
-
-    fun clearSearch() {
-        _state.value = _state.value.copy(
-            searchQuery = "",
-            searchResults = emptyList(),
-            isSearching = false,
-            searchError = null
-        )
-        searchJob?.cancel()
     }
 }

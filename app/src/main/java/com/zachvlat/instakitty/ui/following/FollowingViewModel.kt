@@ -4,9 +4,6 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.zachvlat.instakitty.data.local.SettingsDataStore
-import com.zachvlat.instakitty.data.remote.KittygramRepository
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,7 +20,6 @@ data class FollowingUiState(
 class FollowingViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dataStore = SettingsDataStore(application)
-    private val repository = KittygramRepository(dataStore)
 
     private val _state = MutableStateFlow(FollowingUiState())
     val state: StateFlow<FollowingUiState> = _state.asStateFlow()
@@ -31,12 +27,11 @@ class FollowingViewModel(application: Application) : AndroidViewModel(applicatio
     private val _removingUsers = MutableStateFlow<Set<String>>(emptySet())
     val removingUsers: StateFlow<Set<String>> = _removingUsers.asStateFlow()
 
-    private var avatarJob: Job? = null
-
     init {
         viewModelScope.launch {
             dataStore.profilePics.collect { pics ->
-                _state.value = _state.value.copy(avatars = pics)
+                // Only local files; older builds stored remote CDN links, which expire.
+                _state.value = _state.value.copy(avatars = pics.filterValues { it.startsWith("/") })
             }
         }
         viewModelScope.launch {
@@ -47,25 +42,6 @@ class FollowingViewModel(application: Application) : AndroidViewModel(applicatio
                     usernames = sorted,
                     isLoading = false
                 )
-                fetchMissingAvatars(sorted)
-            }
-        }
-    }
-
-    // Avatars are only fetched when third-party APIs are enabled, and only for
-    // followed users without a cached picture; results persist in DataStore so
-    // each account is fetched once.
-    private fun fetchMissingAvatars(usernames: List<String>) {
-        val cached = _state.value.avatars
-        val missing = usernames.filter { it !in cached }
-        if (missing.isEmpty()) return
-        avatarJob?.cancel()
-        avatarJob = viewModelScope.launch {
-            missing.forEach { username ->
-                if (username in _state.value.avatars) return@forEach
-                val url = repository.getProfileAvatar(username) ?: return@forEach
-                dataStore.updateProfilePic(username, url)
-                delay(AVATAR_STAGGER_MILLIS)
             }
         }
     }
@@ -99,9 +75,5 @@ class FollowingViewModel(application: Application) : AndroidViewModel(applicatio
                 onResult(false, "Invalid JSON: ${e.message}")
             }
         }
-    }
-
-    companion object {
-        private const val AVATAR_STAGGER_MILLIS = 150L
     }
 }

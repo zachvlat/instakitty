@@ -128,9 +128,6 @@ fun AppNavigation(
             }
             composable("home") {
                 HomeScreen(
-                    onNavigateToUser = { username ->
-                        navController.navigate("user/$username")
-                    },
                     onNavigateToPost = { shortcode ->
                         navController.navigate("post/$shortcode")
                     }

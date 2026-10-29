@@ -3,10 +3,9 @@ package com.zachvlat.instakitty.ui.user
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.zachvlat.instakitty.data.local.AvatarCache
 import com.zachvlat.instakitty.data.local.SettingsDataStore
 import com.zachvlat.instakitty.data.remote.ApiResult
-import com.zachvlat.instakitty.data.remote.InstaHighlight
-import com.zachvlat.instakitty.data.remote.InstaStory
 import com.zachvlat.instakitty.data.remote.KittygramRepository
 import com.zachvlat.instakitty.data.remote.Post
 import com.zachvlat.instakitty.data.remote.User
@@ -14,13 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-
-data class StoryViewerState(
-    val title: String?,
-    val stories: List<InstaStory>
-)
 
 data class UserUiState(
     val user: User? = null,
@@ -29,10 +22,7 @@ data class UserUiState(
     val error: String? = null,
     val endCursor: String? = null,
     val isLoadingMore: Boolean = false,
-    val isFollowing: Boolean = false,
-    val highlights: List<InstaHighlight> = emptyList(),
-    val stories: List<InstaStory> = emptyList(),
-    val viewer: StoryViewerState? = null
+    val isFollowing: Boolean = false
 )
 
 class UserViewModel(application: Application) : AndroidViewModel(application) {
@@ -59,7 +49,7 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
                         endCursor = result.data.grid?.cursor,
                         isFollowing = username in followed
                     )
-                    loadExtras(username)
+                    if (username in followed) cacheAvatar(username, result.data.info)
                 }
                 is ApiResult.Error -> {
                     _state.value = UserUiState(isLoading = false, error = result.message)
@@ -101,47 +91,34 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             dataStore.toggleFollow(currentUsername)
             val followed = dataStore.followedUsers.first()
-            _state.value = _state.value.copy(isFollowing = currentUsername in followed)
+            val isFollowing = currentUsername in followed
+            _state.value = _state.value.copy(isFollowing = isFollowing)
+            if (isFollowing) cacheAvatar(currentUsername, _state.value.user, force = true)
         }
     }
 
-    fun openStories() {
-        val stories = _state.value.stories
-        if (stories.isEmpty()) return
-        _state.update { it.copy(viewer = StoryViewerState(it.user?.username, stories)) }
-    }
-
-    fun openHighlight(highlight: InstaHighlight) {
-        val id = highlight.id ?: return
+    // Followed profiles keep a local copy of their picture for the Following page. It is
+    // refreshed at most every few days, piggybacking on profile visits instead of fetching
+    // every followed account up front.
+    private fun cacheAvatar(username: String, user: User?, force: Boolean = false) {
+        val url = user?.profilePicture ?: user?.profilePicUrl ?: return
+        val context = getApplication<Application>()
+        val file = AvatarCache.fileFor(context, username)
+        if (!force && file.exists() &&
+            System.currentTimeMillis() - file.lastModified() < AVATAR_MAX_AGE_MILLIS
+        ) return
         viewModelScope.launch {
-            val items = when (val result = repository.getHighlightItems(id, currentUsername)) {
-                is ApiResult.Success -> result.data
-                else -> emptyList()
-            }
-            if (items.isNotEmpty()) {
-                _state.update { it.copy(viewer = StoryViewerState(highlight.title, items)) }
+            val path = AvatarCache.save(context, username, url) ?: return@launch
+            // The user may have unfollowed while the download was running.
+            if (username in dataStore.followedUsers.first()) {
+                dataStore.updateProfilePic(username, path)
+            } else {
+                file.delete()
             }
         }
     }
 
-    fun closeViewer() {
-        _state.update { it.copy(viewer = null) }
-    }
-
-    private fun loadExtras(username: String) {
-        viewModelScope.launch {
-            val highlights = when (val result = repository.getHighlights(username)) {
-                is ApiResult.Success -> result.data
-                else -> emptyList()
-            }
-            _state.update { it.copy(highlights = highlights) }
-        }
-        viewModelScope.launch {
-            val stories = when (val result = repository.getStories(username)) {
-                is ApiResult.Success -> result.data
-                else -> emptyList()
-            }
-            _state.update { it.copy(stories = stories) }
-        }
+    companion object {
+        private const val AVATAR_MAX_AGE_MILLIS = 3L * 24 * 60 * 60 * 1000
     }
 }

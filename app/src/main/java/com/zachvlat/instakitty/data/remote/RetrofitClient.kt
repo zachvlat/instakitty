@@ -11,8 +11,6 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
 
-    private const val INSTAPEEKA_BASE_URL = "https://instapeeka.com/"
-
     private val json = Json {
         ignoreUnknownKeys = true
         coerceInputValues = true
@@ -26,11 +24,6 @@ object RetrofitClient {
         val url = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
         val client = newHttpClient(token, CommentsHtmlInterceptor(url))
         return newRetrofit(url, client).create(KittygramApi::class.java)
-    }
-
-    fun createThirdParty(): InstapeekaApi {
-        val client = newHttpClient(null, null)
-        return newRetrofit(INSTAPEEKA_BASE_URL, client).create(InstapeekaApi::class.java)
     }
 
     private fun newHttpClient(

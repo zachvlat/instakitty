@@ -2,258 +2,61 @@ package com.zachvlat.instakitty.ui.home
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.zachvlat.instakitty.R
-import com.zachvlat.instakitty.data.remote.User
 
 private val Oswald = FontFamily(
     Font(R.font.oswald_semibold, FontWeight.SemiBold),
     Font(R.font.oswald_bold, FontWeight.Bold)
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onNavigateToUser: (String) -> Unit,
     onNavigateToPost: (String) -> Unit,
     viewModel: HomeViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    var showSearch by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Text(
-                text = "InstaKitty",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 4.dp),
-                fontFamily = Oswald,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 34.sp,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center
-            )
-            TodaySection(
-                items = state.todayPosts,
-                isLoading = state.isLoadingToday,
-                error = state.todayError,
-                onRefresh = viewModel::refreshToday,
-                onPostClick = onNavigateToPost,
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        FloatingActionButton(
-            onClick = { showSearch = true },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Search,
-                contentDescription = "Search users"
-            )
-        }
-    }
-
-    if (showSearch) {
-        ModalBottomSheet(
-            onDismissRequest = { showSearch = false },
-            sheetState = sheetState
-        ) {
-            SearchSheetContent(
-                query = state.searchQuery,
-                isSearching = state.isSearching,
-                error = state.searchError,
-                results = state.searchResults,
-                onQueryChange = viewModel::onSearchQueryChange,
-                onClear = viewModel::clearSearch,
-                onSubmit = {
-                    val q = state.searchQuery.trim().removePrefix("https://").removePrefix("http://")
-                    if (q.contains("instagram.com/p/") || q.contains("instagram.com/reel/")) {
-                        val shortcode = q.split("/p/").lastOrNull()?.split("/")?.firstOrNull()
-                            ?: q.split("/reel/").lastOrNull()?.split("/")?.firstOrNull()
-                        if (shortcode != null) onNavigateToPost(shortcode)
-                    } else if (state.searchResults.isNotEmpty()) {
-                        onNavigateToUser(state.searchResults.first().username ?: q)
-                    } else {
-                        val username = q.trim('/').split("/").firstOrNull()
-                            ?.removePrefix("@")
-                        if (!username.isNullOrBlank()) onNavigateToUser(username)
-                    }
-                },
-                onUserClick = { username ->
-                    showSearch = false
-                    username?.let(onNavigateToUser)
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun SearchSheetContent(
-    query: String,
-    isSearching: Boolean,
-    error: String?,
-    results: List<User>,
-    onQueryChange: (String) -> Unit,
-    onClear: () -> Unit,
-    onSubmit: () -> Unit,
-    onUserClick: (String) -> Unit
-) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+    Column(modifier = Modifier.fillMaxSize()) {
         Text(
-            text = "Search users",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
+            text = "InstaKitty",
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp, bottom = 4.dp),
+            fontFamily = Oswald,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 34.sp,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.Center
         )
-
-        Spacer(Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Type at least 3 characters") },
-            leadingIcon = { Icon(Icons.Filled.Search, null) },
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    IconButton(onClick = onClear) {
-                        Icon(Icons.Filled.Close, "Clear")
-                    }
-                }
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onSubmit() })
+        TodaySection(
+            items = state.todayPosts,
+            isLoading = state.isLoadingToday,
+            error = state.todayError,
+            onRefresh = viewModel::refreshToday,
+            onPostClick = onNavigateToPost,
+            modifier = Modifier.weight(1f)
         )
-
-        Spacer(Modifier.height(8.dp))
-
-        when {
-            isSearching -> {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .padding(vertical = 24.dp)
-                )
-            }
-            error != null -> {
-                Text(
-                    text = error,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 24.dp)
-                )
-            }
-            query.length >= 3 && results.isEmpty() -> {
-                Text(
-                    text = "No users found",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 24.dp)
-                )
-            }
-            results.isNotEmpty() -> {
-                LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
-                    items(results, key = { it.username ?: it.id ?: it.hashCode() }) { user ->
-                        SearchResultItem(
-                            user = user,
-                            onClick = { user.username?.let(onUserClick) }
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-    }
-}
-
-@Composable
-private fun SearchResultItem(
-    user: User,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        val pp = user.profilePicture ?: user.profilePicUrl
-        if (pp != null) {
-            AsyncImage(
-                model = pp,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Surface(
-                modifier = Modifier.size(40.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = user.username?.firstOrNull()?.uppercase() ?: "?",
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text(
-                text = user.username ?: "unknown",
-                fontWeight = FontWeight.Medium,
-                style = MaterialTheme.typography.bodyMedium
-            )
-            if (!user.displayName.isNullOrBlank()) {
-                Text(
-                    text = user.displayName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
     }
 }
 
