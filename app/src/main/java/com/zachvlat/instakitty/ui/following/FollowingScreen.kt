@@ -1,5 +1,6 @@
 package com.zachvlat.instakitty.ui.following
 
+import android.app.Application
 import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -27,8 +27,17 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
+import com.zachvlat.instakitty.data.local.SettingsDataStore
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 @Composable
 fun FollowingScreen(
@@ -38,9 +47,13 @@ fun FollowingScreen(
     val state by viewModel.state.collectAsState()
     val removingUsers by viewModel.removingUsers.collectAsState()
     val visibleUsers = state.usernames.filter { it !in removingUsers }
+
     var showImportDialog by remember { mutableStateOf(false) }
     var importText by remember { mutableStateOf("") }
     var importResult by remember { mutableStateOf("") }
+
+    var usernameToRemove by remember { mutableStateOf<String?>(null) }
+
     val context = LocalContext.current
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -114,7 +127,8 @@ fun FollowingScreen(
                                     .clickable { onUserClick(username) }
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+                                    modifier = Modifier
+                                        .padding(start = 16.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     val avatar = state.avatars[username]
@@ -143,14 +157,20 @@ fun FollowingScreen(
                                             }
                                         }
                                     }
+
                                     Spacer(Modifier.width(12.dp))
+
                                     Text(
                                         text = username,
                                         modifier = Modifier.weight(1f),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Medium
                                     )
-                                    IconButton(onClick = { viewModel.removeUser(username) }) {
+
+                                    IconButton(
+                                        onClick = { usernameToRemove = username },
+                                        enabled = username !in removingUsers
+                                    ) {
                                         Icon(
                                             imageVector = Icons.Filled.Delete,
                                             contentDescription = "Remove",
@@ -177,9 +197,24 @@ fun FollowingScreen(
                     importResult = msg
                     if (ok) {
                         importText = ""
+                        showImportDialog = false
                     }
                 }
             }
+        )
+    }
+
+    val usernameToRemoveLocal = usernameToRemove
+    if (usernameToRemoveLocal != null) {
+        val isRemoving = usernameToRemoveLocal in removingUsers
+        RemoveFollowDialog(
+            username = usernameToRemoveLocal,
+            isRemoving = isRemoving,
+            onConfirm = {
+                viewModel.removeUser(usernameToRemoveLocal)
+                usernameToRemove = null
+            },
+            onDismiss = { usernameToRemove = null }
         )
     }
 }
@@ -242,6 +277,53 @@ private fun ImportDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun RemoveFollowDialog(
+    username: String,
+    isRemoving: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val noOp: () -> Unit = { }
+    val dismissRequest = if (isRemoving) noOp else onDismiss
+    AlertDialog(
+        onDismissRequest = dismissRequest,
+        title = { Text("Remove following") },
+        text = {
+            if (isRemoving) {
+                Column(Modifier.padding(top = 8.dp, bottom = 8.dp)) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Removing @$username…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                Text("Are you sure you want to stop following @$username?")
+            }
+        },
+        confirmButton = {
+            if (!isRemoving) {
+                Button(
+                    onClick = onConfirm,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
+                ) { Text("Remove") }
+            }
+        },
+        dismissButton = {
+            if (!isRemoving) {
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
         }
     )
 }
