@@ -10,8 +10,10 @@ Just a client of the awesome [Kittygram](https://codeberg.org/irelephant/kittygr
   />
 </a>
 <br>
-<img width="200" alt="Screenshot_20260724-175002" src="/screenshots/1.png" />
-<img width="200" alt="Screenshot_20260724-175032" src="/screenshots/2.png" />
-<img width="200" alt="Screenshot_20260724-175032" src="/screenshots/3.png" />
-<img width="200" alt="Screenshot_20260724-175032" src="/screenshots/4.png" />
-<img width="200" alt="Screenshot_20260724-175032" src="/screenshots/5.png" />
+<div style="display: flex; gap: 10px; flex-wrap: nowrap;">
+  <img width="200" src="/screenshots/1.png" />
+  <img width="200" src="/screenshots/2.png" />
+  <img width="200" src="/screenshots/3.png" />
+  <img width="200" src="/screenshots/4.png" />
+  <img width="200" src="/screenshots/5.png" />
+</div>
