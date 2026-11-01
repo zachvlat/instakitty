@@ -1,5 +1,6 @@
 package com.zachvlat.instakitty.ui.explore
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,6 +36,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.zachvlat.instakitty.data.remote.ExploreItem
+import com.zachvlat.instakitty.data.remote.PopularEntry
+import com.zachvlat.instakitty.data.remote.PopularSection
 import com.zachvlat.instakitty.data.remote.User
 import com.zachvlat.instakitty.util.InstagramLinkParser
 
@@ -42,10 +45,23 @@ import com.zachvlat.instakitty.util.InstagramLinkParser
 fun ExploreScreen(
     onPostClick: (String) -> Unit,
     onUserClick: (String) -> Unit,
+    initialQuery: String = "",
     viewModel: ExploreViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
     val gridState = rememberLazyGridState()
+
+    // A hashtag opened from elsewhere arrives as a route argument and is searched immediately.
+    LaunchedEffect(initialQuery) {
+        if (initialQuery.isNotBlank()) viewModel.searchTopic(initialQuery)
+    }
+
+    // The system back gesture leaves an open topic and returns to the popular list.
+    BackHandler(
+        enabled = state.searchMode == SearchMode.Hashtags && state.currentTopic != null
+    ) {
+        viewModel.backToPopular()
+    }
 
     LaunchedEffect(gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index) {
         val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@LaunchedEffect
@@ -236,11 +252,12 @@ fun ExploreScreen(
                     )
                 }
                 state.currentTopic == null -> {
-                    Text(
-                        text = "Search for a topic to explore",
-                        modifier = Modifier.align(Alignment.Center),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    PopularTopics(
+                        sections = state.popularSections,
+                        isLoading = state.isLoadingPopular,
+                        error = state.popularError,
+                        onTopicClick = viewModel::searchTopic,
+                        onRetry = viewModel::loadPopular
                     )
                 }
                 else -> {
@@ -434,6 +451,118 @@ private fun ExploreThumbnail(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PopularTopics(
+    sections: List<PopularSection>,
+    isLoading: Boolean,
+    error: String?,
+    onTopicClick: (String) -> Unit,
+    onRetry: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            isLoading && sections.isEmpty() -> {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+            sections.isEmpty() -> {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = error ?: "Search for a topic to explore",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    if (error != null) {
+                        Spacer(Modifier.height(12.dp))
+                        TextButton(onClick = onRetry) { Text("Retry") }
+                    }
+                }
+            }
+            else -> {
+                LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
+                    items(sections.size) { index ->
+                        val section = sections[index]
+                        if (!section.title.isNullOrBlank()) {
+                            Text(
+                                text = section.title,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(section.entries.size) { i ->
+                                val entry = section.entries[i]
+                                PopularTopicCard(
+                                    entry = entry,
+                                    onClick = { entry.text?.let(onTopicClick) }
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PopularTopicCard(entry: PopularEntry, onClick: () -> Unit) {
+    val text = entry.text ?: return
+    Box(
+        modifier = Modifier
+            .size(width = 120.dp, height = 170.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+    ) {
+        if (entry.thumbnail != null) {
+            AsyncImage(
+                model = entry.thumbnail,
+                contentDescription = text,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {}
+        }
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                Text(
+                    text = "#$text",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                entry.count?.let {
+                    Text(
+                        text = "${formatPlayCount(it)} posts",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

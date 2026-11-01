@@ -171,11 +171,29 @@ class KittygramRepository(private val dataStore: SettingsDataStore) {
         }
     }
 
+    suspend fun getPopularIndex(): ApiResult<PopularResponse> {
+        val client = getClient() ?: return ApiResult.NetworkError("No instance configured")
+        return try {
+            val res = client.getPopularIndex()
+            val body = res.body()
+            when {
+                // Older instances don't expose the index; treat it as empty, not an error.
+                res.code() == 404 -> ApiResult.Success(PopularResponse())
+                !res.isSuccessful -> ApiResult.Error("http_${res.code()}", res.message())
+                body == null -> ApiResult.NetworkError("Empty response")
+                body.status != null && body.status != "ok" ->
+                    ApiResult.Error("api_error", "API returned status: ${body.status}")
+                else -> ApiResult.Success(body)
+            }
+        } catch (e: Exception) {
+            ApiResult.NetworkError(e.message ?: "Popular index failed")
+        }
+    }
+
     suspend fun getUser(
         username: String,
         cursor: String? = null
-    ): ApiResult<UserProfileGridResponse> {
-        val client = getClient() ?: return ApiResult.NetworkError("No instance configured")
+    ): ApiResult<UserProfileGridResponse> {        val client = getClient() ?: return ApiResult.NetworkError("No instance configured")
         return try {
             val res = client.getUser(username, cursor)
             val body = res.body()

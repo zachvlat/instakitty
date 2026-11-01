@@ -16,8 +16,8 @@ android {
         applicationId = "com.zachvlat.instakitty"
         minSdk = 24
         targetSdk = 36
-        versionCode = 18
-        versionName = "1.7.7"
+        versionCode = 19
+        versionName = "1.8.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

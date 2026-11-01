@@ -31,6 +31,7 @@ class SettingsDataStore(private val context: Context) {
         private val PROFILE_PICS = stringPreferencesKey("profile_pics")
         private val FAVORITE_QUERIES = stringPreferencesKey("favorite_queries")
         private val SAVED_POSTS = stringPreferencesKey("saved_posts")
+        private val SAVED_POSTS_CACHE = stringPreferencesKey("saved_posts_cache")
         private val USER_POSTS_CACHE = stringPreferencesKey("user_posts_cache")
     }
 
@@ -84,6 +85,54 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun getSavedPostsSnapshot(): Set<String> = savedPosts.first()
 
+    /** Full metadata for saved posts, so the Saved tab and exports do not refetch them. */
+    suspend fun getSavedPostsCacheSnapshot(): Map<String, Post> {
+        val raw = context.dataStore.data.first()[SAVED_POSTS_CACHE] ?: return emptyMap()
+        return try {
+            Json.decodeFromString<Map<String, Post>>(raw)
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    suspend fun saveSavedPostsCache(entries: Map<String, Post>) {
+        context.dataStore.edit { prefs ->
+            prefs[SAVED_POSTS_CACHE] = Json.encodeToString(entries)
+        }
+    }
+
+    suspend fun cacheSavedPost(post: Post) {
+        val shortcode = post.shortcode ?: return
+        context.dataStore.edit { prefs ->
+            val cached = decodePostCache(prefs[SAVED_POSTS_CACHE])
+            cached[shortcode] = post
+            prefs[SAVED_POSTS_CACHE] = Json.encodeToString(cached)
+        }
+    }
+
+    suspend fun addSavedPosts(shortcodes: Collection<String>) {
+        if (shortcodes.isEmpty()) return
+        context.dataStore.edit { prefs ->
+            val raw = prefs[SAVED_POSTS] ?: "[]"
+            val current = try {
+                Json.decodeFromString<MutableSet<String>>(raw)
+            } catch (_: Exception) {
+                mutableSetOf()
+            }
+            current.addAll(shortcodes)
+            prefs[SAVED_POSTS] = Json.encodeToString(current)
+        }
+    }
+
+    private fun decodePostCache(raw: String?): MutableMap<String, Post> {
+        if (raw == null) return mutableMapOf()
+        return try {
+            Json.decodeFromString<MutableMap<String, Post>>(raw)
+        } catch (_: Exception) {
+            mutableMapOf()
+        }
+    }
+
     suspend fun getUserPostsCacheSnapshot(): Map<String, CachedUserPosts> {
         val raw = context.dataStore.data.first()[USER_POSTS_CACHE] ?: return emptyMap()
         return try {
@@ -99,7 +148,7 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
-    suspend fun toggleSavePost(shortcode: String) {
+    suspend fun toggleSavePost(shortcode: String, post: Post? = null) {
         context.dataStore.edit { prefs ->
             val raw = prefs[SAVED_POSTS] ?: "[]"
             val current = try {
@@ -109,8 +158,17 @@ class SettingsDataStore(private val context: Context) {
             }
             if (shortcode in current) {
                 current.remove(shortcode)
+                val cached = decodePostCache(prefs[SAVED_POSTS_CACHE])
+                if (cached.remove(shortcode) != null) {
+                    prefs[SAVED_POSTS_CACHE] = Json.encodeToString(cached)
+                }
             } else {
                 current.add(shortcode)
+                if (post != null && post.shortcode == shortcode) {
+                    val cached = decodePostCache(prefs[SAVED_POSTS_CACHE])
+                    cached[shortcode] = post
+                    prefs[SAVED_POSTS_CACHE] = Json.encodeToString(cached)
+                }
             }
             prefs[SAVED_POSTS] = Json.encodeToString(current)
         }

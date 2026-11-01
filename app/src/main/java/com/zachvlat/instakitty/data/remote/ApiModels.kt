@@ -39,6 +39,27 @@ data class ExploreResponse(
 )
 
 @Serializable
+data class PopularEntry(
+    val text: String? = null,
+    val count: Long? = null,
+    val thumbnail: String? = null
+)
+
+@Serializable
+data class PopularSection(
+    val title: String? = null,
+    @Serializable(with = EmptyObjectAsPopularEntryListSerializer::class)
+    val entries: List<PopularEntry> = emptyList()
+)
+
+@Serializable
+data class PopularResponse(
+    val status: String? = null,
+    @Serializable(with = EmptyObjectAsPopularSectionListSerializer::class)
+    val items: List<PopularSection> = emptyList()
+)
+
+@Serializable
 data class ApiError(
     @SerialName("has_errors") val hasErrors: Boolean = false,
     @SerialName("error_type") val errorType: String? = null,
@@ -150,6 +171,34 @@ object EmptyObjectAsExploreItemListSerializer : KSerializer<List<ExploreItem>> {
         encoder.encodeSerializableValue(delegate, value)
     }
 }
+
+// cjson encodes an empty Lua table as {}, so tolerate objects anywhere a list is expected.
+class EmptyObjectAsListSerializer<T>(
+    private val elementSerializer: KSerializer<T>
+) : KSerializer<List<T>> {
+    private val delegate = ListSerializer(elementSerializer)
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun deserialize(decoder: Decoder): List<T> {
+        val input = decoder as JsonDecoder
+        val element = input.decodeJsonElement()
+        return if (element is JsonArray) {
+            input.json.decodeFromJsonElement(delegate, element)
+        } else {
+            emptyList()
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: List<T>) {
+        encoder.encodeSerializableValue(delegate, value)
+    }
+}
+
+object EmptyObjectAsPopularSectionListSerializer :
+    KSerializer<List<PopularSection>> by EmptyObjectAsListSerializer(PopularSection.serializer())
+
+object EmptyObjectAsPopularEntryListSerializer :
+    KSerializer<List<PopularEntry>> by EmptyObjectAsListSerializer(PopularEntry.serializer())
 
 @Serializable
 data class SearchResponse(

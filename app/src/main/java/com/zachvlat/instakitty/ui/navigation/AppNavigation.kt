@@ -1,5 +1,6 @@
 package com.zachvlat.instakitty.ui.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
@@ -61,6 +62,17 @@ fun AppNavigation(
     val showBottomBar = currentRoute != null && currentRoute != "setup"
 
     var selectedTab by remember { mutableStateOf(BottomTab.Home) }
+
+    // Every #hashtag link lands on the Explore tab with the topic already searched.
+    val openHashtag: (String) -> Unit = { tag ->
+        selectedTab = BottomTab.Explore
+        navController.navigate("explore?query=${Uri.encode(tag)}") {
+            popUpTo(navController.graph.startDestinationId) {
+                inclusive = false
+            }
+            launchSingleTop = true
+        }
+    }
 
     LaunchedEffect(deepLinkRoute, startDestination) {
         android.util.Log.d(
@@ -133,8 +145,18 @@ fun AppNavigation(
                     }
                 )
             }
-            composable("explore") {
+            composable(
+                route = "explore?query={query}",
+                arguments = listOf(
+                    navArgument("query") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    }
+                )
+            ) { backStackEntry ->
+                val initialQuery = backStackEntry.arguments?.getString("query").orEmpty()
                 ExploreScreen(
+                    initialQuery = initialQuery,
                     onPostClick = { shortcode ->
                         navController.navigate("post/$shortcode")
                     },
@@ -160,20 +182,36 @@ fun AppNavigation(
                     },
                     onOpenUser = { username ->
                         navController.navigate("user/$username")
-                    }
+                    },
+                    onHashtagClick = openHashtag
                 )
             }
             composable(
-                route = "post/{shortcode}",
-                arguments = listOf(navArgument("shortcode") { type = NavType.StringType })
+                route = "post/{shortcode}?siblings={siblings}",
+                arguments = listOf(
+                    navArgument("shortcode") { type = NavType.StringType },
+                    navArgument("siblings") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    }
+                )
             ) { backStackEntry ->
                 val shortcode = backStackEntry.arguments?.getString("shortcode") ?: return@composable
+                val siblings = remember(backStackEntry) {
+                    backStackEntry.arguments?.getString("siblings")
+                        .orEmpty()
+                        .split(',')
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() }
+                }
                 PostScreen(
                     shortcode = shortcode,
+                    siblings = siblings,
                     onBack = { navController.popBackStack() },
                     onUserClick = { username ->
                         navController.navigate("user/$username")
-                    }
+                    },
+                    onHashtagClick = openHashtag
                 )
             }
             composable(
@@ -184,9 +222,15 @@ fun AppNavigation(
                 UserScreen(
                     username = username,
                     onBack = { navController.popBackStack() },
-                    onPostClick = { shortcode ->
-                        navController.navigate("post/$shortcode")
-                    }
+                    onPostClick = { shortcode, siblings ->
+                        navController.navigate(
+                            "post/$shortcode?siblings=${Uri.encode(siblings.joinToString(","))}"
+                        )
+                    },
+                    onUserClick = { mentionedUsername ->
+                        navController.navigate("user/$mentionedUsername")
+                    },
+                    onHashtagClick = openHashtag
                 )
             }
         }

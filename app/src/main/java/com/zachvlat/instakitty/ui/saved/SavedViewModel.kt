@@ -38,11 +38,18 @@ class SavedViewModel(application: Application) : AndroidViewModel(application) {
                     return@collect
                 }
                 _state.value = _state.value.copy(isLoading = true)
-                val loaded = codes.mapNotNull { sc ->
-                    when (val result = repository.getPost(sc)) {
-                        is ApiResult.Success -> result.data
+                // Prefer the cached metadata so returning to this tab does not refetch every
+                // post. Only saved posts that were never cached hit the API.
+                val cached = dataStore.getSavedPostsCacheSnapshot()
+                val fetched = mutableMapOf<String, Post>()
+                val loaded = codes.mapNotNull { shortcode ->
+                    cached[shortcode] ?: when (val result = repository.getPost(shortcode)) {
+                        is ApiResult.Success -> result.data.also { fetched[shortcode] = it }
                         else -> null
                     }
+                }
+                if (fetched.isNotEmpty()) {
+                    dataStore.saveSavedPostsCache(cached + fetched)
                 }
                 _state.value = SavedUiState(posts = loaded, isLoading = false)
             }

@@ -7,6 +7,7 @@ import com.zachvlat.instakitty.data.local.SettingsDataStore
 import com.zachvlat.instakitty.data.remote.ApiResult
 import com.zachvlat.instakitty.data.remote.ExploreItem
 import com.zachvlat.instakitty.data.remote.KittygramRepository
+import com.zachvlat.instakitty.data.remote.PopularSection
 import com.zachvlat.instakitty.data.remote.User
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -29,7 +30,10 @@ data class ExploreUiState(
     val isLoadingMore: Boolean = false,
     val error: String? = null,
     val endCursor: String? = null,
-    val favoriteQueries: List<String> = emptyList()
+    val favoriteQueries: List<String> = emptyList(),
+    val popularSections: List<PopularSection> = emptyList(),
+    val isLoadingPopular: Boolean = false,
+    val popularError: String? = null
 )
 
 class ExploreViewModel(application: Application) : AndroidViewModel(application) {
@@ -46,9 +50,11 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 _state.value = _state.value.copy(favoriteQueries = favorites)
             }
         }
+        loadPopular()
     }
 
     private var userSearchJob: Job? = null
+    private var topicJob: Job? = null
 
     // A leading "@" or "#" switches the mode, so either kind of search can be typed directly.
     fun onSearchQueryChange(query: String) {
@@ -57,7 +63,19 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             query.startsWith("#") -> SearchMode.Hashtags
             else -> _state.value.searchMode
         }
-        _state.value = _state.value.copy(searchQuery = query, searchMode = mode)
+        // Clearing the field returns to the popular list instead of staying on the last grid.
+        _state.value = if (query.isEmpty() && mode == SearchMode.Hashtags) {
+            _state.value.copy(
+                searchQuery = "",
+                searchMode = mode,
+                currentTopic = null,
+                items = emptyList(),
+                endCursor = null,
+                error = null
+            )
+        } else {
+            _state.value.copy(searchQuery = query, searchMode = mode)
+        }
         if (mode == SearchMode.Accounts) scheduleUserSearch() else cancelUserSearch()
     }
 
@@ -111,12 +129,13 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     fun searchTopic(topic: String) {
         if (topic.isBlank()) return
+        topicJob?.cancel()
         _state.value = _state.value.copy(
             searchQuery = topic,
             searchMode = SearchMode.Hashtags,
             currentTopic = topic
         )
-        viewModelScope.launch {
+        topicJob = viewModelScope.launch {
             _state.value = _state.value.copy(
                 isLoading = true, error = null,
                 items = emptyList(), endCursor = null
@@ -143,11 +162,34 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun loadPopular() {
+        if (_state.value.isLoadingPopular) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoadingPopular = true, popularError = null)
+            _state.value = when (val result = repository.getPopularIndex()) {
+                is ApiResult.Success -> _state.value.copy(
+                    popularSections = result.data.items
+                        .map { section ->
+                            section.copy(entries = section.entries.filter { !it.text.isNullOrBlank() })
+                        }
+                        .filter { it.entries.isNotEmpty() },
+                    isLoadingPopular = false
+                )
+                is ApiResult.Error -> _state.value.copy(
+                    isLoadingPopular = false, popularError = result.message
+                )
+                is ApiResult.NetworkError -> _state.value.copy(
+                    isLoadingPopular = false, popularError = result.message
+                )
+            }
+        }
+    }
+
     fun loadMore() {
         val cursor = _state.value.endCursor ?: return
         val topic = _state.value.currentTopic ?: return
         if (_state.value.isLoadingMore) return
-        viewModelScope.launch {
+        topicJob = viewModelScope.launch {
             _state.value = _state.value.copy(isLoadingMore = true)
             when (val result = repository.getPopular(topic, cursor)) {
                 is ApiResult.Success -> {
@@ -165,6 +207,19 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
         }
+    }
+
+    fun backToPopular() {
+        topicJob?.cancel()
+        _state.value = _state.value.copy(
+            searchQuery = "",
+            currentTopic = null,
+            items = emptyList(),
+            endCursor = null,
+            error = null,
+            isLoading = false,
+            isLoadingMore = false
+        )
     }
 
     fun toggleFavorite() {

@@ -1,7 +1,8 @@
 package com.zachvlat.instakitty.ui.following
 
-import android.app.Application
-import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,17 +28,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
-import com.zachvlat.instakitty.data.local.SettingsDataStore
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun FollowingScreen(
@@ -55,6 +51,41 @@ fun FollowingScreen(
     var usernameToRemove by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val isExporting by viewModel.isExporting.collectAsState()
+
+    var pendingExport by remember { mutableStateOf<String?>(null) }
+
+    val createExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        val payload = pendingExport
+        pendingExport = null
+        if (uri != null && payload != null) {
+            scope.launch {
+                val saved = viewModel.writeExport(uri, payload)
+                Toast.makeText(
+                    context,
+                    if (saved) "Export saved" else "Could not save export",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    val openImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.importFromUri(uri) { ok, msg ->
+                importResult = msg
+                if (ok) {
+                    importText = ""
+                    showImportDialog = false
+                }
+            }
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
@@ -74,17 +105,36 @@ fun FollowingScreen(
         ) {
             OutlinedButton(
                 onClick = {
-                    val json = viewModel.exportJson()
-                    val sendIntent = Intent().apply {
-                        action = Intent.ACTION_SEND
-                        putExtra(Intent.EXTRA_TEXT, json)
-                        type = "text/plain"
+                    if (isExporting) return@OutlinedButton
+                    scope.launch {
+                        val payload = viewModel.buildExportJson()
+                        if (payload == null) {
+                            Toast.makeText(context, "Export failed", Toast.LENGTH_LONG).show()
+                        } else {
+                            pendingExport = payload
+                            val stamp = SimpleDateFormat(
+                                "yyyyMMdd-HHmmss",
+                                Locale.US
+                            ).format(Date())
+                            createExportLauncher.launch("instakitty-export-$stamp.json")
+                        }
                     }
-                    context.startActivity(Intent.createChooser(sendIntent, "Export follows"))
                 },
+                enabled = !isExporting,
                 modifier = Modifier.weight(1f)
             ) {
-                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                if (isExporting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        Icons.Filled.Share,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
                 Spacer(Modifier.width(6.dp))
                 Text("Export")
             }
@@ -192,6 +242,11 @@ fun FollowingScreen(
             result = importResult,
             onTextChange = { importText = it },
             onDismiss = { showImportDialog = false },
+            onPickFile = {
+                openImportLauncher.launch(
+                    arrayOf("application/json", "text/plain", "application/octet-stream")
+                )
+            },
             onImport = {
                 viewModel.importJson(importText) { ok, msg ->
                     importResult = msg
@@ -225,6 +280,7 @@ private fun ImportDialog(
     result: String,
     onTextChange: (String) -> Unit,
     onDismiss: () -> Unit,
+    onPickFile: () -> Unit,
     onImport: () -> Unit
 ) {
     val focusManager = LocalFocusManager.current
@@ -235,10 +291,17 @@ private fun ImportDialog(
         text = {
             Column {
                 Text(
-                    text = "Paste the JSON from your export",
+                    text = "Choose an InstaKitty export file, or paste JSON below.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onPickFile,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Load from file")
+                }
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = text,

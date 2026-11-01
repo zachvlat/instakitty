@@ -42,4 +42,7 @@ interface KittygramApi {
         @Path("topic") topic: String,
         @Query("cursor") cursor: String? = null
     ): Response<ExploreResponse>
+
+    @GET("api/popular")
+    suspend fun getPopularIndex(): Response<PopularResponse>
 }

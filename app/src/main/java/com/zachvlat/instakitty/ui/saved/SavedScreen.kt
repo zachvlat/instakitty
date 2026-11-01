@@ -20,6 +20,7 @@ import com.zachvlat.instakitty.ui.components.PostCard
 fun SavedScreen(
     onOpenPost: (String) -> Unit,
     onOpenUser: (String) -> Unit,
+    onHashtagClick: (String) -> Unit,
     viewModel: SavedViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -73,6 +74,7 @@ fun SavedScreen(
                                 post = post,
                                 onPostClick = onOpenPost,
                                 onUserClick = onOpenUser,
+                                onHashtagClick = onHashtagClick,
                                 onDelete = { post.shortcode?.let(viewModel::removeSaved) }
                             )
                         }

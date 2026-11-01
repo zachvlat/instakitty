@@ -23,12 +23,15 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.zachvlat.instakitty.data.remote.Post
+import com.zachvlat.instakitty.ui.components.RichText
 
 @Composable
 fun UserScreen(
     username: String,
     onBack: () -> Unit,
-    onPostClick: (String) -> Unit,
+    onPostClick: (String, List<String>) -> Unit,
+    onUserClick: (String) -> Unit,
+    onHashtagClick: (String) -> Unit,
     viewModel: UserViewModel = viewModel()
 ) {
     LaunchedEffect(username) {
@@ -93,7 +96,9 @@ fun UserScreen(
                                 UserHeader(
                                     user = user,
                                     isFollowing = state.isFollowing,
-                                    onToggleFollow = { viewModel.toggleFollow() }
+                                    onToggleFollow = { viewModel.toggleFollow() },
+                                    onUserClick = onUserClick,
+                                    onHashtagClick = onHashtagClick
                                 )
                             }
                         }
@@ -103,11 +108,12 @@ fun UserScreen(
                             }
                         }
                         val posts = state.posts
+                        val postShortcodes = posts.mapNotNull { it.shortcode }
                         items(posts.size, key = { index -> "${posts[index].shortcode ?: posts[index].id ?: "post"}_$index" }) { index ->
                             val post = posts[index]
                             ProfilePostThumbnail(
                                 post = post,
-                                onClick = { post.shortcode?.let(onPostClick) }
+                                onClick = { post.shortcode?.let { onPostClick(it, postShortcodes) } }
                             )
                         }
                         if (state.isLoadingMore) {
@@ -131,7 +137,9 @@ fun UserScreen(
 private fun UserHeader(
     user: com.zachvlat.instakitty.data.remote.User,
     isFollowing: Boolean,
-    onToggleFollow: () -> Unit
+    onToggleFollow: () -> Unit,
+    onUserClick: (String) -> Unit,
+    onHashtagClick: (String) -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)
@@ -181,12 +189,14 @@ private fun UserHeader(
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp
         )
-        if (user.username != null) {
-            Text(
-                text = user.biography ?: "",
+        if (user.username != null && !user.biography.isNullOrBlank()) {
+            RichText(
+                text = user.biography,
                 fontSize = 14.sp,
                 maxLines = 3,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                onHashtagClick = onHashtagClick,
+                onUserClick = onUserClick
             )
         }
 

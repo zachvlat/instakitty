@@ -40,4 +40,22 @@ object AvatarCache {
                 null
             }
         }
+
+    /** Restores an avatar from backup bytes; returns the stored file's path, or null on failure. */
+    suspend fun saveBytes(context: Context, username: String, bytes: ByteArray): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                val file = fileFor(context, username)
+                file.parentFile?.mkdirs()
+                val tmp = File(file.path + ".tmp")
+                tmp.writeBytes(bytes)
+                if (!tmp.renameTo(file)) {
+                    file.delete()
+                    if (!tmp.renameTo(file)) return@withContext null
+                }
+                file.path
+            } catch (_: Exception) {
+                null
+            }
+        }
 }

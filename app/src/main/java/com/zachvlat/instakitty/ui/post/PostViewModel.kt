@@ -8,6 +8,7 @@ import com.zachvlat.instakitty.data.remote.ApiResult
 import com.zachvlat.instakitty.data.remote.Comment
 import com.zachvlat.instakitty.data.remote.KittygramRepository
 import com.zachvlat.instakitty.data.remote.Post
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,15 +33,19 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     val state: StateFlow<PostUiState> = _state.asStateFlow()
 
     private var currentShortcode: String? = null
+    private var loadJob: Job? = null
 
     fun loadPost(shortcode: String) {
         currentShortcode = shortcode
+        loadJob?.cancel()
         _state.value = PostUiState(isLoading = true)
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             val saved = shortcode in dataStore.getSavedPostsSnapshot()
             when (val result = repository.getPost(shortcode)) {
                 is ApiResult.Success -> {
-                    _state.value = PostUiState(post = result.data, isLoading = false, isSaved = saved)
+                    val post = result.data
+                    if (saved) dataStore.cacheSavedPost(post)
+                    _state.value = PostUiState(post = post, isLoading = false, isSaved = saved)
                     loadComments(shortcode)
                 }
                 is ApiResult.Error -> {
@@ -56,27 +61,25 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleSave() {
         val sc = currentShortcode ?: return
         viewModelScope.launch {
-            dataStore.toggleSavePost(sc)
+            dataStore.toggleSavePost(sc, _state.value.post)
             _state.value = _state.value.copy(
                 isSaved = sc in dataStore.getSavedPostsSnapshot()
             )
         }
     }
 
-    private fun loadComments(shortcode: String) {
-        viewModelScope.launch {
-            _state.value = _state.value.copy(isLoadingComments = true)
-            when (val result = repository.getComments(shortcode)) {
-                is ApiResult.Success -> {
-                    _state.value = _state.value.copy(
-                        comments = result.data.items,
-                        commentsEndCursor = result.data.endCursor,
-                        isLoadingComments = false
-                    )
-                }
-                else -> {
-                    _state.value = _state.value.copy(isLoadingComments = false)
-                }
+    private suspend fun loadComments(shortcode: String) {
+        _state.value = _state.value.copy(isLoadingComments = true)
+        when (val result = repository.getComments(shortcode)) {
+            is ApiResult.Success -> {
+                _state.value = _state.value.copy(
+                    comments = result.data.items,
+                    commentsEndCursor = result.data.endCursor,
+                    isLoadingComments = false
+                )
+            }
+            else -> {
+                _state.value = _state.value.copy(isLoadingComments = false)
             }
         }
     }

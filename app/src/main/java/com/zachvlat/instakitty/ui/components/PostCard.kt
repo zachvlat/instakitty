@@ -23,6 +23,7 @@ fun PostCard(
     post: Post,
     onPostClick: (String) -> Unit,
     onUserClick: (String) -> Unit,
+    onHashtagClick: (String) -> Unit,
     onDelete: (() -> Unit)? = null
 ) {
     Card(
@@ -151,11 +152,13 @@ fun PostCard(
                 }
                 if (!post.caption.isNullOrBlank()) {
                     Spacer(Modifier.height(4.dp))
-                    Text(
+                    RichText(
                         text = post.caption,
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        onHashtagClick = onHashtagClick,
+                        onUserClick = onUserClick
                     )
                 }
             }
